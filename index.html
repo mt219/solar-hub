@@ -1384,46 +1384,6 @@ select.ei{cursor:pointer}
       <div id="ms-summary" style="padding:12px 16px;display:flex;gap:20px;flex-wrap:wrap;background:var(--bg);border-bottom:1px solid var(--bdr)"></div>
       <div style="overflow-x:auto"><div id="ms-table"></div></div>
     </div>
-    <div class="card">
-      <div class="card-head"><div class="ch-icon" style="background:#ede9fe">💷</div><div><div class="ch-title">Log payment milestone</div><div class="ch-sub">Deposit, balance, grant claim etc. — linked to job ref</div></div></div>
-      <div class="card-body">
-        <div class="fg">
-          <div class="fld"><label>Job ref</label><input class="inp" id="fin-ref" placeholder="e.g. 13223"></div>
-          <div class="fld"><label>Customer name</label><input class="inp" id="fin-name" placeholder="e.g. Smith"></div>
-          <div class="fld"><label>Milestone</label>
-            <select class="inp" id="fin-milestone">
-              <option>Deposit due</option><option>Balance due</option><option>Retention due</option>
-              <option>Grant claim submitted</option><option>Grant received</option><option>Invoice raised</option><option>Other</option>
-            </select>
-          </div>
-          <div class="fld"><label>Amount (£)</label><input class="inp" id="fin-amount" type="number" placeholder="0.00"></div>
-          <div class="fld"><label>Due date</label><input class="inp" id="fin-due" type="date"></div>
-          <div class="fld"><label>Status</label>
-            <select class="inp" id="fin-status">
-              <option value="outstanding">Outstanding</option><option value="invoiced">Invoiced</option>
-              <option value="overdue">Overdue</option><option value="paid">Paid ✓</option>
-            </select>
-          </div>
-          <div class="fld ff"><label>Notes</label><input class="inp" id="fin-notes" placeholder="e.g. Chasing since 10 May"></div>
-        </div>
-        <div style="display:flex;gap:10px;margin-top:12px">
-          <button class="btn btn-green" onclick="finSave()">Save milestone</button>
-          <button class="btn btn-ghost" onclick="finClear()">Clear</button>
-        </div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-head">
-        <div class="ch-icon" style="background:#fee2e2">⚠</div>
-        <div><div class="ch-title">Outstanding &amp; overdue</div><div class="ch-sub">All unpaid milestones</div></div>
-        <div style="margin-left:auto;display:flex;gap:8px">
-          <button class="btn btn-ghost btn-xs" onclick="showMondayPrompt()">🔗 Monday.com AI prompt</button>
-          <button class="btn btn-ghost btn-xs" onclick="draftFinanceEmail()">✉ Hub draft (backup)</button>
-          <button class="btn btn-green btn-xs" onclick="renderFinance()">↻</button>
-        </div>
-      </div>
-      <div style="overflow-x:auto"><div id="fin-table"></div></div>
-    </div>
     <div id="fin-email-wrap" style="display:none" class="card">
       <div class="card-head"><div class="ch-icon" style="background:#e0f2fe">📧</div><div><div class="ch-title">Finance summary email</div><div class="ch-sub">Review and send to finance team</div></div></div>
       <div class="card-body">
@@ -1613,8 +1573,10 @@ Ref 12196 (Jenny Roe) done 16 May, Fox ESS, on time
     </div>
     <!-- Earned value -->
     <div class="card">
-      <div class="card-head"><div class="ch-icon" style="background:#fef3c7">💰</div><div><div class="ch-title">Earned value — cumulative from payment schedule</div><div class="ch-sub">Paid milestones vs outstanding — from finance records</div></div></div>
-      <div class="card-body" id="kpi-earned-value"></div>
+      <div class="card-head"><div class="ch-icon" style="background:#fef3c7">💰</div><div><div class="ch-title">Earned value — cumulative cash flow</div><div class="ch-sub">Actual received (solid) vs projected from payment schedule (dotted)</div></div></div>
+      <div class="card-body" id="kpi-earned-value">
+        <canvas id="kpi-earned-chart" style="width:100%;height:220px"></canvas>
+      </div>
     </div>
     <!-- Target history -->
     <div id="target-editor" style="display:none">
@@ -8526,24 +8488,37 @@ function renderMilestones(){
 
 function renderFinSummary(){
   finJobsLoad(); finLoad();
+  // Derive totals from payment schedule (JOBS data), not manual FIN_ROWS
+  const addDays=(d,n)=>{ const dt=new Date(d+'T12:00:00'); dt.setDate(dt.getDate()+n); return dt.toISOString().slice(0,10); };
+  const today=new Date().toISOString().slice(0,10);
   const scheduled=FIN_JOBS.filter(r=>r.status==='scheduled').reduce((a,r)=>a+r.value,0);
   const completed=FIN_JOBS.filter(r=>r.status==='completed').reduce((a,r)=>a+r.value,0);
-  const outstanding=FIN_ROWS.filter(r=>r.status!=='paid').reduce((a,r)=>a+r.amount,0);
-  const overdue=FIN_ROWS.filter(r=>r.status==='overdue').reduce((a,r)=>a+r.amount,0);
+  // Build outstanding from auto payment schedule
+  let schedOutstanding=0, schedOverdue=0;
+  JOBS.filter(j=>!j._archived).forEach(j=>{
+    const cv=parseFloat(j.contractValue)||0; if(!cv)return;
+    const hasScaff=!!(j.scafUp);
+    const advDate=hasScaff?addDays(j.scafUp,-14):(j.start?addDays(j.start,-7):'');
+    [{pct:50,date:advDate},{pct:35,date:j.end||j.start||''},{pct:5,date:j.hDate||''}].forEach(m=>{
+      if(!m.date)return;
+      const amt=cv*(m.pct/100);
+      schedOutstanding+=amt;
+      if(m.date<today) schedOverdue+=amt;
+    });
+  });
   const s=gel('fin-summary');
   if(!s)return;
   s.innerHTML=[
     {l:'Scheduled pipeline',v:'£'+scheduled.toLocaleString('en-GB'),c:'#d97706'},
     {l:'Completed this year',v:'£'+completed.toLocaleString('en-GB'),c:'#059669'},
-    {l:'Milestones outstanding',v:'£'+outstanding.toLocaleString('en-GB'),c:'#7c3aed'},
-    {l:'Overdue',v:'£'+overdue.toLocaleString('en-GB'),c:overdue>0?'#dc2626':'#059669'},
+    {l:'Schedule outstanding',v:'£'+Math.round(schedOutstanding).toLocaleString('en-GB'),c:'#7c3aed'},
+    {l:'Schedule overdue',v:'£'+Math.round(schedOverdue).toLocaleString('en-GB'),c:schedOverdue>0?'#dc2626':'#059669'},
   ].map(m=>`<div style="background:var(--card);border:1.5px solid var(--bdr);border-radius:10px;padding:12px 14px">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:4px">${m.l}</div>
     <div style="font-size:20px;font-weight:700;color:${m.c};font-family:var(--mo)">${m.v}</div>
   </div>`).join('');
   const nb=gel('nb-finance');
-  const od=FIN_ROWS.filter(r=>r.status==='overdue').length;
-  if(nb){nb.textContent=od||'';nb.style.display=od?'':'none';}
+  if(nb){nb.textContent='';nb.style.display='none';}
 }
 
 // ── MILESTONES ──
@@ -8579,56 +8554,36 @@ function finEdit(idx){
 function finDelete(idx){if(!confirm('Delete?'))return;const id=FIN_ROWS[idx]?.id;FIN_ROWS.splice(idx,1);if(id)sbDeleteFinRow(id);renderFinance();renderFinSummary();}
 function finMarkPaid(idx){if(FIN_ROWS[idx]){FIN_ROWS[idx].status='paid';sbUpsertFinRow(FIN_ROWS[idx]);renderFinance();renderFinSummary();}}
 
-function renderFinance(){
-  finLoad();
-  const tbl=gel('fin-table');if(!tbl)return;
-  const statusColor={outstanding:'#d97706',invoiced:'#1e40af',overdue:'#dc2626',paid:'#059669'};
-  const statusBg={outstanding:'#fef3c7',invoiced:'#dbeafe',overdue:'#fee2e2',paid:'#d1fae5'};
-  const sorted=[...FIN_ROWS].sort((a,b)=>{
-    if(a.status==='overdue'&&b.status!=='overdue')return -1;
-    if(b.status==='overdue'&&a.status!=='overdue')return 1;
-    return (a.due||'').localeCompare(b.due||'');
-  });
-  if(!sorted.length){tbl.innerHTML='<div style="padding:20px;font-size:13px;color:var(--ink3);text-align:center">No milestones yet.</div>';return;}
-  tbl.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px">
-    <thead><tr style="background:var(--bg)">
-      ${['Ref','Customer','Milestone','Amount','Due','Status','Notes',''].map(h=>`<th style="padding:9px 12px;text-align:${h==='Amount'?'right':'left'};border-bottom:1.5px solid var(--bdr);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3)">${h}</th>`).join('')}
-    </tr></thead><tbody>
-    ${sorted.map(r=>{
-      const origIdx=FIN_ROWS.indexOf(r);
-      return `<tr style="border-bottom:1px solid var(--bdr);${r.status==='overdue'?'background:#fff5f5':''}">
-        <td style="padding:9px 12px;font-family:var(--mo);font-weight:700;color:var(--grn)">${r.ref}</td>
-        <td style="padding:9px 12px">${r.name}</td>
-        <td style="padding:9px 12px">${r.milestone}</td>
-        <td style="padding:9px 12px;text-align:right;font-family:var(--mo);font-weight:700">£${r.amount.toLocaleString('en-GB',{minimumFractionDigits:2})}</td>
-        <td style="padding:9px 12px;${r.status==='overdue'?'color:#dc2626;font-weight:700':''}">${r.due?new Date(r.due+'T12:00').toLocaleDateString('en-GB'):'—'}</td>
-        <td style="padding:9px 12px"><span style="font-size:10px;padding:2px 8px;border-radius:999px;font-weight:700;background:${statusBg[r.status]||'#f3f4f6'};color:${statusColor[r.status]||'#374151'}">${r.status}</span></td>
-        <td style="padding:9px 12px;color:var(--ink3);font-size:11px">${r.notes}</td>
-        <td style="padding:9px 12px;white-space:nowrap">
-          ${r.status!=='paid'?`<button onclick="finMarkPaid(${origIdx})" style="background:#d1fae5;color:#065f46;border:none;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;cursor:pointer;margin-right:3px">✓ Paid</button>`:''}
-          <button onclick="finEdit(${origIdx})" style="background:var(--bg);border:1.5px solid var(--bdr2);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;margin-right:3px">Edit</button>
-          <button onclick="finDelete(${origIdx})" style="background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer">✕</button>
-        </td>
-      </tr>`;
-    }).join('')}
-    </tbody></table>`;
-}
+function renderFinance(){ /* no-op — manual milestone log removed; schedule auto-calculated from JOBS */ }
 
 async function draftFinanceEmail(){
-  finLoad();finJobsLoad();
+  finJobsLoad();
   const wrap=gel('fin-email-wrap');const body=gel('fin-email-body');
   if(!wrap||!body)return;
   wrap.style.display='';body.value='Generating… ⏳';
-  const outstanding=FIN_ROWS.filter(r=>r.status!=='paid');
-  const rows=outstanding.map(r=>`Ref ${r.ref} (${r.name}) — ${r.milestone} — £${r.amount.toLocaleString('en-GB')} — due ${r.due||'TBC'} — ${r.status}${r.notes?' — '+r.notes:''}`).join('\n')||'No outstanding milestones.';
+  // Build schedule summary from JOBS
+  const addDays=(d,n)=>{ const dt=new Date(d+'T12:00:00'); dt.setDate(dt.getDate()+n); return dt.toISOString().slice(0,10); };
+  const today=new Date().toISOString().slice(0,10);
+  const schedRows=[];
+  JOBS.filter(j=>!j._archived).forEach(j=>{
+    const cv=parseFloat(j.contractValue)||0; if(!cv)return;
+    const hasScaff=!!(j.scafUp);
+    const advDate=hasScaff?addDays(j.scafUp,-14):(j.start?addDays(j.start,-7):'');
+    [{label:'Advance (50%)',pct:50,date:advDate},{label:'Installation (35%)',pct:35,date:j.end||j.start||''},{label:'Commissioning (5%)',pct:5,date:j.hDate||''}].forEach(m=>{
+      if(!m.date)return;
+      const overdue=m.date<today;
+      schedRows.push(`Ref ${j.ref||'—'} (${j.name||'—'}) — ${m.label} — £${Math.round(cv*m.pct/100).toLocaleString('en-GB')} — due ${new Date(m.date+'T12:00').toLocaleDateString('en-GB')}${overdue?' — ⚠ OVERDUE':''}`);
+    });
+  });
+  const rows=schedRows.join('\n')||'No scheduled milestones.';
   const thisMonth=new Date().toISOString().slice(0,7);
   const monthJobs=FIN_JOBS.filter(r=>r.month===thisMonth);
   const monthSummary=monthJobs.length?monthJobs.map(r=>`${r.ref} ${r.name} £${r.value.toLocaleString('en-GB')} (${r.status})`).join(', '):'No jobs this month';
-  const today=new Date().toLocaleDateString('en-GB');
+  const todayFmt=new Date().toLocaleDateString('en-GB');
   try{
     const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,
-        messages:[{role:'user',content:`Write a brief professional email from the Solar PM to GreenGen Finance dated ${today}. Summarise: (1) this month's install pipeline: ${monthSummary}, (2) outstanding payment milestones. Highlight overdue items. Collegial tone. Sign off "Solar PM".\n\nMilestones:\n${rows}`}]})});
+        messages:[{role:'user',content:`Write a brief professional email from the Solar PM to GreenGen Finance dated ${todayFmt}. Summarise: (1) this month's install pipeline: ${monthSummary}, (2) upcoming and overdue payment milestones from the schedule. Highlight overdue items. Collegial tone. Sign off "Solar PM".\n\nSchedule milestones:\n${rows}`}]})});
     const d=await resp.json();body.value=d.content?.[0]?.text||'';
   }catch(e){body.value='Error: '+e.message;}
 }
@@ -8810,7 +8765,7 @@ function deleteTarget(idx){
   renderKPIChart();
 }
 
-let KPI_CHART_INSTALLS=null, KPI_CHART_KWP=null, KPI_CHART_KWH=null;
+let KPI_CHART_INSTALLS=null, KPI_CHART_KWP=null, KPI_CHART_KWH=null, KPI_CHART_EARNED=null;
 
 function renderKPIChart(){
   soLoad();
@@ -8878,21 +8833,106 @@ function renderKPIChart(){
   }
 
   // Earned value panel
-  const ev=gel('kpi-earned-value');
-  if(ev){
-    const paid=FIN_ROWS.filter(r=>r.status==='paid').reduce((a,r)=>a+(parseFloat(r.amount)||0),0);
-    const outstanding=FIN_ROWS.filter(r=>r.status!=='paid').reduce((a,r)=>a+(parseFloat(r.amount)||0),0);
-    const total=paid+outstanding;
-    const pct=total>0?Math.round(paid/total*100):0;
-    ev.innerHTML=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px">
-      ${[{l:'Earned (paid)',v:'£'+paid.toLocaleString('en-GB'),c:'#059669'},{l:'Outstanding',v:'£'+outstanding.toLocaleString('en-GB'),c:'#d97706'},{l:'Total contracted',v:'£'+total.toLocaleString('en-GB'),c:'#1e40af'}].map(s=>`
-      <div style="background:var(--bg);border:1.5px solid var(--bdr);border-radius:10px;padding:12px 14px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);margin-bottom:4px">${s.l}</div>
-        <div style="font-size:18px;font-weight:700;color:${s.c};font-family:var(--mo)">${s.v}</div>
-      </div>`).join('')}
-    </div>
-    <div style="background:var(--bdr);border-radius:4px;height:8px;overflow:hidden"><div style="background:#059669;width:${pct}%;height:100%;border-radius:4px;transition:.3s"></div></div>
-    <div style="font-size:11px;color:var(--ink3);margin-top:6px">${pct}% of contracted value earned</div>`;
+  // Earned value — cumulative line chart
+  const earnedCanvas=gel('kpi-earned-chart');
+  if(earnedCanvas){
+    // Build payment schedule projection from JOBS (M2 50%, M3 35%, M4 5%; M1 deposit excluded)
+    const addDays=(d,n)=>{ const dt=new Date(d+'T12:00:00'); dt.setDate(dt.getDate()+n); return dt.toISOString().slice(0,10); };
+    const projEvents=[];
+    JOBS.filter(j=>!j._archived).forEach(j=>{
+      const cv=parseFloat(j.contractValue)||0; if(!cv)return;
+      const hasScaff=!!(j.scafUp);
+      const advDate=hasScaff?addDays(j.scafUp,-14):(j.start?addDays(j.start,-7):'');
+      if(advDate) projEvents.push({date:advDate,amount:cv*0.50});
+      const instDate=j.end||j.start||''; if(instDate) projEvents.push({date:instDate,amount:cv*0.35});
+      const commDate=j.hDate||''; if(commDate) projEvents.push({date:commDate,amount:cv*0.05});
+    });
+    projEvents.sort((a,b)=>a.date.localeCompare(b.date));
+
+    // Build actual paid from FIN_ROWS (kept for backward compat with any existing data)
+    const paidEvents=[...FIN_ROWS.filter(r=>r.status==='paid'&&r.due)]
+      .map(r=>({date:r.due,amount:parseFloat(r.amount)||0}))
+      .sort((a,b)=>a.date.localeCompare(b.date));
+
+    // Determine label range: earliest of proj/paid to latest + a couple months ahead
+    const allDates=[...projEvents.map(e=>e.date),...paidEvents.map(e=>e.date)].filter(Boolean).sort();
+    if(!allDates.length){
+      earnedCanvas.parentElement.innerHTML='<div style="font-size:13px;color:var(--ink3);padding:16px">No jobs with contract values and dates set.</div>';
+    } else {
+      // Generate monthly labels
+      const startMs=new Date(allDates[0].slice(0,7)+'-01');
+      const endDate=new Date(allDates[allDates.length-1].slice(0,7)+'-01');
+      endDate.setMonth(endDate.getMonth()+2);
+      const monthLabels=[];
+      const cur=new Date(startMs);
+      while(cur<=endDate){
+        monthLabels.push(cur.toISOString().slice(0,7));
+        cur.setMonth(cur.getMonth()+1);
+      }
+      const fmtLabel=m=>new Date(m+'-15').toLocaleDateString('en-GB',{month:'short',year:'2-digit'});
+
+      // Cumulative projection per month
+      let projCum=0;
+      const projData=monthLabels.map(m=>{
+        projEvents.filter(e=>e.date.slice(0,7)===m).forEach(e=>projCum+=e.amount);
+        return Math.round(projCum);
+      });
+
+      // Cumulative actual per month (only up to current month)
+      const todayYM=new Date().toISOString().slice(0,7);
+      let paidCum=0;
+      const paidData=monthLabels.map(m=>{
+        if(m>todayYM) return null;
+        paidEvents.filter(e=>e.date.slice(0,7)===m).forEach(e=>paidCum+=e.amount);
+        return Math.round(paidCum);
+      });
+
+      if(KPI_CHART_EARNED){try{KPI_CHART_EARNED.destroy();}catch(e){}}
+      KPI_CHART_EARNED=new Chart(earnedCanvas.getContext('2d'),{
+        type:'line',
+        data:{
+          labels:monthLabels.map(fmtLabel),
+          datasets:[
+            {
+              label:'Projected (schedule)',
+              data:projData,
+              borderColor:'#d97706',
+              backgroundColor:'rgba(217,119,6,0.08)',
+              borderWidth:2,
+              borderDash:[6,4],
+              pointRadius:3,
+              pointBackgroundColor:'#d97706',
+              fill:true,
+              tension:0.3
+            },
+            {
+              label:'Actual received',
+              data:paidData,
+              borderColor:'#059669',
+              backgroundColor:'rgba(5,150,105,0.10)',
+              borderWidth:2.5,
+              pointRadius:4,
+              pointBackgroundColor:'#059669',
+              fill:false,
+              tension:0.3,
+              spanGaps:false
+            }
+          ]
+        },
+        options:{
+          responsive:true,
+          maintainAspectRatio:false,
+          plugins:{
+            legend:{position:'bottom',labels:{font:{size:11},usePointStyle:true}},
+            tooltip:{callbacks:{label:ctx=>' £'+ctx.parsed.y.toLocaleString('en-GB')}}
+          },
+          scales:{
+            y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.05)'},ticks:{callback:v=>'£'+v.toLocaleString('en-GB')}},
+            x:{grid:{display:false}}
+          }
+        }
+      });
+    }
   }
 }
 
