@@ -526,7 +526,12 @@ select.ei{cursor:pointer}
     <div class="card-head">
       <div class="ch-icon" style="background:#f3e8ff">👷</div>
       <div><div class="ch-title">Install staff</div><div class="ch-sub">Role "Electrician" auto-fills F43 tester name</div></div>
-      <button class="btn btn-ghost btn-xs" onclick="addStaff()" style="margin-left:auto">+ Add</button>
+      <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+        <select id="staff-picker" class="inp" style="font-size:11px;padding:4px 8px;width:160px" onchange="pickStaff(this)">
+          <option value="">+ Add saved contractor</option>
+        </select>
+        <button class="btn btn-ghost btn-xs" onclick="addStaff()">+ Manual</button>
+      </div>
     </div>
     <div class="card-body">
       <div class="eq-wrap" id="staff-list"></div>
@@ -1415,9 +1420,56 @@ select.ei{cursor:pointer}
       <div id="ms-summary" style="padding:12px 16px;display:flex;gap:20px;flex-wrap:wrap;background:var(--bg);border-bottom:1px solid var(--bdr)"></div>
       <div style="overflow-x:auto"><div id="ms-table"></div></div>
     </div>
+    <div class="card">
+      <div class="card-head"><div class="ch-icon" style="background:#ede9fe">💷</div><div><div class="ch-title">Log payment milestone</div><div class="ch-sub">Deposit, balance, grant claim etc. — linked to job ref</div></div></div>
+      <div class="card-body">
+        <div class="fg">
+          <div class="fld"><label>Job ref</label><input class="inp" id="fin-ref" placeholder="e.g. 13223"></div>
+          <div class="fld"><label>Customer name</label><input class="inp" id="fin-name" placeholder="e.g. Smith"></div>
+          <div class="fld"><label>Milestone</label>
+            <select class="inp" id="fin-milestone">
+              <option>Deposit due</option><option>Balance due</option><option>Retention due</option>
+              <option>Grant claim submitted</option><option>Grant received</option><option>Invoice raised</option><option>Other</option>
+            </select>
+          </div>
+          <div class="fld"><label>Amount (£)</label><input class="inp" id="fin-amount" type="number" placeholder="0.00"></div>
+          <div class="fld"><label>Due date</label><input class="inp" id="fin-due" type="date"></div>
+          <div class="fld"><label>Status</label>
+            <select class="inp" id="fin-status">
+              <option value="outstanding">Outstanding</option><option value="invoiced">Invoiced</option>
+              <option value="overdue">Overdue</option><option value="paid">Paid ✓</option>
+            </select>
+          </div>
+          <div class="fld ff"><label>Notes</label><input class="inp" id="fin-notes" placeholder="e.g. Chasing since 10 May"></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:12px">
+          <button class="btn btn-green" onclick="finSave()">Save milestone</button>
+          <button class="btn btn-ghost" onclick="finClear()">Clear</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div class="ch-icon" style="background:#fee2e2">⚠</div>
+        <div><div class="ch-title">Outstanding &amp; overdue</div><div class="ch-sub">All unpaid milestones</div></div>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn btn-ghost btn-xs" onclick="showMondayPrompt()">🔗 Monday.com AI prompt</button>
+          <button class="btn btn-ghost btn-xs" onclick="draftFinanceEmail()">✉ Hub draft (backup)</button>
+          <button class="btn btn-green btn-xs" onclick="renderFinance()">↻</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto"><div id="fin-table"></div></div>
+    </div>
+    <div id="fin-email-wrap" style="display:none" class="card">
+      <div class="card-head"><div class="ch-icon" style="background:#e0f2fe">📧</div><div><div class="ch-title">Finance summary email</div><div class="ch-sub">Review and send to finance team</div></div></div>
+      <div class="card-body">
+        <textarea class="inp" id="fin-email-body" rows="12" style="font-family:var(--fn)"></textarea>
+        <button class="btn btn-green btn-sm" style="margin-top:10px" onclick="openFinanceEmail()">Open in Gmail →</button>
+      </div>
+    </div>
   </div>
   <!-- TAB: SUB-CONTRACTORS -->
-  </div><div id="fin-pane-subs" style="display:none">
+  <div id="fin-pane-subs" style="display:none">
     <div class="card">
       <div class="card-head"><div class="ch-icon" style="background:#d1fae5">👷</div><div><div class="ch-title">Add / edit sub-contractor</div><div class="ch-sub">Register · requirements · geography · status</div></div></div>
       <div class="card-body">
@@ -1497,55 +1549,6 @@ select.ei{cursor:pointer}
       <button class="btn btn-ghost" onclick="closeMondayPrompt()">Close</button>
     </div>
     <div id="monday-prompt-copied" style="display:none;font-size:12px;color:var(--grn);margin-top:8px">✓ Copied to clipboard</div>
-  </div>
-</div>
-    <div class="card">
-      <div class="card-head"><div class="ch-icon" style="background:#ede9fe">💷</div><div><div class="ch-title">Log payment milestone</div><div class="ch-sub">Deposit, balance, grant claim etc. — linked to job ref</div></div></div>
-      <div class="card-body">
-        <div class="fg">
-          <div class="fld"><label>Job ref</label><input class="inp" id="fin-ref" placeholder="e.g. 13223"></div>
-          <div class="fld"><label>Customer name</label><input class="inp" id="fin-name" placeholder="e.g. Smith"></div>
-          <div class="fld"><label>Milestone</label>
-            <select class="inp" id="fin-milestone">
-              <option>Deposit due</option><option>Balance due</option><option>Retention due</option>
-              <option>Grant claim submitted</option><option>Grant received</option><option>Invoice raised</option><option>Other</option>
-            </select>
-          </div>
-          <div class="fld"><label>Amount (£)</label><input class="inp" id="fin-amount" type="number" placeholder="0.00"></div>
-          <div class="fld"><label>Due date</label><input class="inp" id="fin-due" type="date"></div>
-          <div class="fld"><label>Status</label>
-            <select class="inp" id="fin-status">
-              <option value="outstanding">Outstanding</option><option value="invoiced">Invoiced</option>
-              <option value="overdue">Overdue</option><option value="paid">Paid ✓</option>
-            </select>
-          </div>
-          <div class="fld ff"><label>Notes</label><input class="inp" id="fin-notes" placeholder="e.g. Chasing since 10 May"></div>
-        </div>
-        <div style="display:flex;gap:10px;margin-top:12px">
-          <button class="btn btn-green" onclick="finSave()">Save milestone</button>
-          <button class="btn btn-ghost" onclick="finClear()">Clear</button>
-        </div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-head">
-        <div class="ch-icon" style="background:#fee2e2">⚠</div>
-        <div><div class="ch-title">Outstanding &amp; overdue</div><div class="ch-sub">All unpaid milestones</div></div>
-        <div style="margin-left:auto;display:flex;gap:8px">
-          <button class="btn btn-ghost btn-xs" onclick="showMondayPrompt()">🔗 Monday.com AI prompt</button>
-          <button class="btn btn-ghost btn-xs" onclick="draftFinanceEmail()">✉ Hub draft (backup)</button>
-          <button class="btn btn-green btn-xs" onclick="renderFinance()">↻</button>
-        </div>
-      </div>
-      <div style="overflow-x:auto"><div id="fin-table"></div></div>
-    </div>
-    <div id="fin-email-wrap" style="display:none" class="card">
-      <div class="card-head"><div class="ch-icon" style="background:#e0f2fe">📧</div><div><div class="ch-title">Finance summary email</div><div class="ch-sub">Review and send to finance team</div></div></div>
-      <div class="card-body">
-        <textarea class="inp" id="fin-email-body" rows="12" style="font-family:var(--fn)"></textarea>
-        <button class="btn btn-green btn-sm" style="margin-top:10px" onclick="openFinanceEmail()">Open in Gmail →</button>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -2468,8 +2471,24 @@ function renderStaff() {
       <input class="ei" placeholder="Full name" value="${s.name||''}" oninput="J.staff[${i}].name=this.value">
       <button class="rm" onclick="J.staff.splice(${i},1);renderStaff()">×</button>
     </div>`).join('');
+  // Populate contractor picker from SUB_LIST
+  const picker=gel('staff-picker'); if(!picker) return;
+  subLoad();
+  const active=SUB_LIST.filter(s=>s.status==='active'||s.status==='trial');
+  picker.innerHTML='<option value="">+ Add saved contractor</option>'+
+    active.map(s=>`<option value="${encodeURIComponent(JSON.stringify({name:s.name,type:s.type}))}">${s.name}${s.type?' ('+s.type+')':''}</option>`).join('');
 }
 function addStaff() { if(!J.staff) J.staff=[]; J.staff.push({role:'',name:''}); renderStaff(); }
+function pickStaff(sel) {
+  if(!sel.value) return;
+  const data=JSON.parse(decodeURIComponent(sel.value));
+  if(!J.staff) J.staff=[];
+  // map sub type to a sensible role
+  const roleMap={'Roofer':'Roofer','Electrician':'Electrician','Roofer + Electrician':'Electrician','Commercial only':'Electrician','ASHP':'ASHP Engineer','EV Charger':'EV Charger Engineer'};
+  J.staff.push({role:roleMap[data.type]||data.type||'', name:data.name});
+  renderStaff();
+  sel.value='';
+}
 
 // ════════════════════════════════════════════════════════════
 // EQUIPMENT
@@ -8071,7 +8090,7 @@ function finTab(t){
     if(pane) pane.style.display=tab===t?'':'none';
   });
   if(t==='monthly') renderMonthly();
-  if(t==='milestones') renderMilestones();
+  if(t==='milestones'){ renderMilestones(); renderFinance(); }
   if(t==='subs'){ subLoad(); renderSubTable(); renderSubRegions(); }
 }
 
