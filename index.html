@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>GreenGenUK · Solar PV Hub v41</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,700;0,800;1,700&family=Dancing+Script:wght@700&family=Caveat:wght@600&family=Pacifico&display=swap" rel="stylesheet">
-<!-- Supabase -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<!-- Supabase removed - running standalone -->
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -7967,27 +7966,9 @@ function sbStatus(msg, ok) {
 }
 
 async function sbInit() {
-  if (IS_READONLY) {
-    const b = gel('readonly-banner'); if (b) b.style.display = 'flex';
-    // Disable all save buttons in readonly mode
-    document.querySelectorAll('button.btn-green, button.btn').forEach(btn => {
-      const t = btn.textContent.trim().toLowerCase();
-      if (t.includes('save') || t.includes('sign off') || t.includes('extract') || t.includes('paid') || t.includes('delete') || t.includes('move')) {
-        btn.disabled = true; btn.style.opacity = '0.4'; btn.style.cursor = 'not-allowed';
-      }
-    });
-  }
-  try {
-    const { error } = await sb.from('fin_jobs').select('id').limit(1);
-    if (error) throw error;
-    sbStatus(IS_READONLY ? '👁 view-only' : '🟢 live', true);
-    await sbPullAll();
-    sbSubscribe();
-  } catch(e) {
-    sbStatus('⚠ offline', false);
-    console.warn('Supabase init failed, falling back to localStorage:', e.message);
-    finJobsLoadLocal(); finLoadLocal(); soLoadLocal();
-  }
+  // Standalone mode - localStorage only
+  sbStatus('🟢 live', true);
+  finJobsLoadLocal(); finLoadLocal(); soLoadLocal();
 }
 
 async function sbPullAll() {
@@ -8708,8 +8689,9 @@ goSection = function(id){
 
 finJobsLoad();finLoad();soLoad();subLoad();
 
-// Boot Supabase sync
-sbInit();
+// Standalone mode - no Supabase
+sbStatus('🟢 live', true);
+finJobsLoadLocal(); finLoadLocal(); soLoadLocal();
 
 </script>
 </body>
