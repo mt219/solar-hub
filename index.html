@@ -254,7 +254,7 @@ select.ei{cursor:pointer}
     <div class="current-job" id="job-pill" onclick="goSection('saved')">No job loaded</div>
     <button class="btn btn-white btn-sm" onclick="newJob()">+ New job</button>
     <button class="btn btn-monday btn-sm" onclick="openMonday()">🔗 monday.com</button>
-    <span id="sb-status" style="font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);font-family:var(--mo)">⏳ connecting…</span>
+    <span id="sb-status" style="font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);font-family:var(--mo)">🟢 live</span>
   </div>
 </div>
 
@@ -1592,22 +1592,48 @@ Ref 12196 (Jenny Roe) done 16 May, Fox ESS, on time
 
   <!-- CHART TAB -->
   <div id="kpi-pane-chart" style="display:none">
+    <!-- Installs per week vs target -->
     <div class="card">
-      <div class="card-head"><div class="ch-icon" style="background:#dbeafe">📊</div><div><div class="ch-title">Install throughput — last 8 weeks</div><div class="ch-sub">From signed-off installs</div></div></div>
+      <div class="card-head">
+        <div class="ch-icon" style="background:#dbeafe">📊</div>
+        <div><div class="ch-title">Installs per week vs target</div><div class="ch-sub">Weekly sign-offs against current target — click a bar to sign off</div></div>
+        <button class="btn btn-green btn-xs" style="margin-left:auto" onclick="showTargetEditor()">Set target</button>
+      </div>
       <div class="card-body"><canvas id="kpi-chart" style="width:100%;height:220px"></canvas></div>
     </div>
+    <!-- kWp installed -->
     <div class="card">
-      <div class="card-head"><div class="ch-icon" style="background:#fef3c7">🎯</div><div><div class="ch-title">Targets vs actuals</div><div class="ch-sub">12-week improvement goals</div></div></div>
-      <div class="card-body"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="kpi-targets"></div></div>
+      <div class="card-head"><div class="ch-icon" style="background:#d1fae5">⚡</div><div><div class="ch-title">kWp of roof PV installed — last 8 weeks</div><div class="ch-sub">From signed-off installs with panel data</div></div></div>
+      <div class="card-body"><canvas id="kpi-chart-kwp" style="width:100%;height:180px"></canvas></div>
+    </div>
+    <!-- kWh battery installed -->
+    <div class="card">
+      <div class="card-head"><div class="ch-icon" style="background:#ede9fe">🔋</div><div><div class="ch-title">kWh of battery storage installed — last 8 weeks</div><div class="ch-sub">From signed-off installs with battery data</div></div></div>
+      <div class="card-body"><canvas id="kpi-chart-kwh" style="width:100%;height:180px"></canvas></div>
+    </div>
+    <!-- Earned value -->
+    <div class="card">
+      <div class="card-head"><div class="ch-icon" style="background:#fef3c7">💰</div><div><div class="ch-title">Earned value — cumulative from payment schedule</div><div class="ch-sub">Paid milestones vs outstanding — from finance records</div></div></div>
+      <div class="card-body" id="kpi-earned-value"></div>
+    </div>
+    <!-- Target history -->
+    <div id="target-editor" style="display:none">
+      <div class="card" style="border:1.5px solid var(--grn)">
+        <div class="card-head"><div class="ch-icon" style="background:#d1fae5">🎯</div><div><div class="ch-title">Weekly install target</div><div class="ch-sub">Log a target change — saved permanently</div></div></div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end">
+            <div class="fld"><label>Effective from</label><input class="inp" type="date" id="tgt-date" /></div>
+            <div class="fld"><label>Weekly install target</label><input class="inp" type="number" id="tgt-value" min="1" max="20" placeholder="e.g. 5" /></div>
+            <button class="btn btn-green" onclick="saveTarget()">Save</button>
+          </div>
+          <div id="tgt-history" style="margin-top:14px"></div>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- ACTIONS TAB -->
   <div id="kpi-pane-actions" style="display:none">
-    <div class="card">
-      <div class="card-head"><div class="ch-icon" style="background:#fee2e2">⚠</div><div><div class="ch-title">Outstanding actions</div><div class="ch-sub">Auto-generated from saved jobs and sign-off log</div></div></div>
-      <div class="card-body" id="kpi-actions"></div>
-    </div>
     <div class="card">
       <div class="card-head"><div class="ch-icon" style="background:#ede9fe">📈</div><div><div class="ch-title">Overrun analysis</div><div class="ch-sub">From signed-off installs with overrun logged</div></div></div>
       <div class="card-body" id="kpi-overrun"></div>
@@ -8617,8 +8643,6 @@ function openFinanceEmail(){
 // ═══════════════════════════════════════════════════════════════
 
 let SO_LOG = [];
-let KPI_CHART_OBJ = null;
-
 function soLoadLocal(){ try{ SO_LOG=JSON.parse(localStorage.getItem('gguk_soLog')||'[]'); }catch(e){ SO_LOG=[]; } }
 function soStoreLocal(){ try{ localStorage.setItem('gguk_soLog',JSON.stringify(SO_LOG)); }catch(e){} }
 function soLoad(){} // no-op — data pulled from Supabase on init
@@ -8737,41 +8761,138 @@ function renderKPIMetrics(){
   </div>`).join('');
 }
 
+// ── Target history helpers ──
+function loadTargets(){
+  try{ return JSON.parse(localStorage.getItem('gguk_kpi_targets')||'[]'); }catch(e){ return []; }
+}
+function saveTargets(arr){
+  try{ localStorage.setItem('gguk_kpi_targets', JSON.stringify(arr)); }catch(e){}
+}
+function getTargetForWeek(weekEndDate, targets){
+  // find the most recent target with effective date <= weekEndDate
+  const sorted = [...targets].sort((a,b)=>a.date<b.date?-1:1);
+  let tgt = 4; // default
+  for(const t of sorted){ if(t.date <= weekEndDate) tgt = t.value; }
+  return tgt;
+}
+function showTargetEditor(){
+  const el=gel('target-editor');
+  if(!el)return;
+  el.style.display = el.style.display==='none'?'':'none';
+  if(el.style.display==='') renderTargetHistory();
+  const di=gel('tgt-date'); if(di) di.value=new Date().toISOString().slice(0,10);
+}
+function renderTargetHistory(){
+  const targets=loadTargets(); const el=gel('tgt-history'); if(!el)return;
+  if(!targets.length){el.innerHTML='<div style="font-size:12px;color:var(--ink3)">No target history yet.</div>';return;}
+  const sorted=[...targets].sort((a,b)=>b.date<a.date?-1:1);
+  el.innerHTML='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);margin-bottom:8px">Target history</div>'+
+    sorted.map((t,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:13px">
+      <span style="flex:1">${t.date}</span>
+      <span style="font-weight:600">${t.value} installs/week</span>
+      <button class="btn btn-ghost btn-xs" style="padding:2px 8px" onclick="deleteTarget(${i})">✕</button>
+    </div>`).join('');
+}
+function saveTarget(){
+  const d=gel('tgt-date'),v=gel('tgt-value');
+  if(!d||!v||!d.value||!v.value)return;
+  const targets=loadTargets();
+  targets.push({date:d.value, value:parseInt(v.value)||4});
+  saveTargets(targets);
+  renderTargetHistory();
+  renderKPIChart();
+}
+function deleteTarget(idx){
+  const sorted=[...loadTargets()].sort((a,b)=>b.date<a.date?-1:1);
+  sorted.splice(idx,1);
+  saveTargets(sorted);
+  renderTargetHistory();
+  renderKPIChart();
+}
+
+let KPI_CHART_INSTALLS=null, KPI_CHART_KWP=null, KPI_CHART_KWH=null;
+
 function renderKPIChart(){
   soLoad();
-  const canvas=gel('kpi-chart');if(!canvas)return;
   const now=new Date();
-  const weeks=[],labels=[];
+  const targets=loadTargets();
+  const weeks=[],labels=[],targetLine=[],kwpWeeks=[],kwhWeeks=[];
   for(let w=7;w>=0;w--){
     const wS=new Date(now-(w+1)*7*864e5),wE=new Date(now-w*7*864e5);
-    weeks.push(SO_LOG.filter(r=>r.date&&new Date(r.date+'T12:00')>=wS&&new Date(r.date+'T12:00')<wE).length);
+    const wEStr=wE.toISOString().slice(0,10);
+    const wJobs=SO_LOG.filter(r=>r.date&&new Date(r.date+'T12:00')>=wS&&new Date(r.date+'T12:00')<wE);
+    weeks.push(wJobs.length);
     labels.push(wE.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}));
+    targetLine.push(getTargetForWeek(wEStr, targets));
+    // kWp: match signed-off refs to JOBS to get panel data
+    let wKwp=0, wKwh=0;
+    for(const soRow of wJobs){
+      const job=JOBS.find(j=>j.ref===soRow.ref);
+      if(job){
+        if(job.panels&&Array.isArray(job.panels)){
+          for(const p of job.panels) wKwp+=((parseFloat(p.wp)||0)*(parseInt(p.qty)||0))/1000;
+        }
+        if(job.batteries&&Array.isArray(job.batteries)){
+          for(const b of job.batteries) wKwh+=(parseFloat(b.kwh)||0);
+        }
+      }
+    }
+    kwpWeeks.push(Math.round(wKwp*10)/10);
+    kwhWeeks.push(Math.round(wKwh*10)/10);
   }
-  if(KPI_CHART_OBJ){try{KPI_CHART_OBJ.destroy();}catch(e){}}
-  KPI_CHART_OBJ=new Chart(canvas.getContext('2d'),{
-    type:'bar',
-    data:{labels,datasets:[{label:'Installs signed off',data:weeks,backgroundColor:weeks.map(v=>v>=5?'#059669':v>=3?'#d97706':'#9ca3af'),borderRadius:4}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(0,0,0,0.05)'}},x:{grid:{display:false}}}}
-  });
-  const tgt=gel('kpi-targets');
-  if(tgt){
-    const overrunRate=SO_LOG.length?Math.round(100*SO_LOG.filter(r=>r.overrun!=='on-time').length/SO_LOG.length):0;
-    const perWeek=parseFloat((SO_LOG.filter(r=>r.date&&new Date(r.date+'T12:00')>=new Date(now-28*864e5)).length/4).toFixed(1));
-    tgt.innerHTML=[
-      {l:'Installs/week',cur:perWeek,tgt:5,unit:'',higher:true},
-      {l:'Overrun rate',cur:overrunRate,tgt:20,unit:'%',higher:false},
-    ].map(t=>{
-      const on=t.higher?t.cur>=t.tgt:t.cur<=t.tgt;
-      const pct=Math.min(100,t.higher?Math.round(t.cur/t.tgt*100):Math.round((100-t.cur)/Math.max(100-t.tgt,1)*100));
-      return `<div style="background:var(--bg);border:1.5px solid var(--bdr);border-radius:10px;padding:12px 14px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);margin-bottom:6px">${t.l}</div>
-        <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:6px">
-          <span style="font-size:18px;font-weight:700;color:${on?'#059669':'#dc2626'};font-family:var(--mo)">${t.cur}${t.unit}</span>
-          <span style="font-size:11px;color:var(--ink3)">target: ${t.tgt}${t.unit}</span>
-        </div>
-        <div style="background:var(--bdr);border-radius:3px;height:5px"><div style="background:${on?'#059669':'#d97706'};width:${pct}%;height:100%;border-radius:3px"></div></div>
-      </div>`;
-    }).join('');
+
+  // Chart 1: installs vs target
+  const canvas=gel('kpi-chart');
+  if(canvas){
+    if(KPI_CHART_INSTALLS){try{KPI_CHART_INSTALLS.destroy();}catch(e){}}
+    KPI_CHART_INSTALLS=new Chart(canvas.getContext('2d'),{
+      type:'bar',
+      data:{labels,datasets:[
+        {label:'Installs',data:weeks,backgroundColor:weeks.map((v,i)=>v>=targetLine[i]?'#059669':v>=targetLine[i]*0.7?'#d97706':'#9ca3af'),borderRadius:4,yAxisID:'y'},
+        {label:'Target',data:targetLine,type:'line',borderColor:'#6366f1',borderWidth:2,pointRadius:3,fill:false,tension:0.2,yAxisID:'y'}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{font:{size:11}}}},scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(0,0,0,0.05)'}},x:{grid:{display:false}}}}
+    });
+  }
+
+  // Chart 2: kWp
+  const cKwp=gel('kpi-chart-kwp');
+  if(cKwp){
+    if(KPI_CHART_KWP){try{KPI_CHART_KWP.destroy();}catch(e){}}
+    KPI_CHART_KWP=new Chart(cKwp.getContext('2d'),{
+      type:'bar',
+      data:{labels,datasets:[{label:'kWp installed',data:kwpWeeks,backgroundColor:'#2563eb',borderRadius:4}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.05)'},ticks:{callback:v=>v+'kWp'}},x:{grid:{display:false}}}}
+    });
+  }
+
+  // Chart 3: kWh
+  const cKwh=gel('kpi-chart-kwh');
+  if(cKwh){
+    if(KPI_CHART_KWH){try{KPI_CHART_KWH.destroy();}catch(e){}}
+    KPI_CHART_KWH=new Chart(cKwh.getContext('2d'),{
+      type:'bar',
+      data:{labels,datasets:[{label:'kWh installed',data:kwhWeeks,backgroundColor:'#7c3aed',borderRadius:4}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.05)'},ticks:{callback:v=>v+'kWh'}},x:{grid:{display:false}}}}
+    });
+  }
+
+  // Earned value panel
+  const ev=gel('kpi-earned-value');
+  if(ev){
+    const paid=FIN_ROWS.filter(r=>r.status==='paid').reduce((a,r)=>a+(parseFloat(r.amount)||0),0);
+    const outstanding=FIN_ROWS.filter(r=>r.status!=='paid').reduce((a,r)=>a+(parseFloat(r.amount)||0),0);
+    const total=paid+outstanding;
+    const pct=total>0?Math.round(paid/total*100):0;
+    ev.innerHTML=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px">
+      ${[{l:'Earned (paid)',v:'£'+paid.toLocaleString('en-GB'),c:'#059669'},{l:'Outstanding',v:'£'+outstanding.toLocaleString('en-GB'),c:'#d97706'},{l:'Total contracted',v:'£'+total.toLocaleString('en-GB'),c:'#1e40af'}].map(s=>`
+      <div style="background:var(--bg);border:1.5px solid var(--bdr);border-radius:10px;padding:12px 14px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);margin-bottom:4px">${s.l}</div>
+        <div style="font-size:18px;font-weight:700;color:${s.c};font-family:var(--mo)">${s.v}</div>
+      </div>`).join('')}
+    </div>
+    <div style="background:var(--bdr);border-radius:4px;height:8px;overflow:hidden"><div style="background:#059669;width:${pct}%;height:100%;border-radius:4px;transition:.3s"></div></div>
+    <div style="font-size:11px;color:var(--ink3);margin-top:6px">${pct}% of contracted value earned</div>`;
   }
 }
 
