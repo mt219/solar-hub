@@ -1143,51 +1143,6 @@ select.ei{cursor:pointer}
     </div>
   </div>
 
-  <div class="card" id="batch-import-card">
-    <div class="card-head">
-      <div class="ch-icon" style="background:#e8f5e9">&#128229;</div>
-      <div><div class="ch-title">Load May 2026 batch (8 jobs)</div><div class="ch-sub">Watson · Bates · Cooley · Roe · Logan · Lobb · Cook · Muid</div></div>
-      <button class="btn btn-green btn-xs" onclick="loadMay2026Batch()" id="batch-btn" style="margin-left:auto">&#8595; Load jobs</button>
-    </div>
-    <div id="batch-status" style="display:none;padding:8px 16px 12px;font-size:12px"></div>
-  </div>
-
-  <div class="card" id="aug2026-batch-import-card">
-    <div class="card-head">
-      <div class="ch-icon" style="background:#e3f2fd">&#128229;</div>
-      <div><div class="ch-title">Load Aug 2026 batch (8 jobs)</div><div class="ch-sub">Downes · Polglase · Breame · Wills · Marns · Mooney · Levack · Jubb</div></div>
-      <button class="btn btn-green btn-xs" onclick="loadAug2026Batch()" id="aug-batch-btn" style="margin-left:auto">&#8595; Load jobs</button>
-    </div>
-    <div id="aug-batch-status" style="display:none;padding:8px 16px 12px;font-size:12px"></div>
-  </div>
-
-  <div class="card" id="jun2026-batch-import-card">
-    <div class="card-head">
-      <div class="ch-icon" style="background:#f3e5f5">&#128229;</div>
-      <div><div class="ch-title">Load Jun 2026 batch (1 job)</div><div class="ch-sub">Bedford</div></div>
-      <button class="btn btn-green btn-xs" onclick="loadJun2026Batch()" id="jun-batch-btn" style="margin-left:auto">&#8595; Load jobs</button>
-    </div>
-    <div id="jun-batch-status" style="display:none;padding:8px 16px 12px;font-size:12px"></div>
-  </div>
-
-  <div class="card" id="newjobs2026-batch-import-card">
-    <div class="card-head">
-      <div class="ch-icon" style="background:#fff8e1">&#128229;</div>
-      <div><div class="ch-title">Load new jobs batch — Jun/Jul/Aug 2026 (5 jobs)</div><div class="ch-sub">Walker (16974) · Marchant (8728) · MacDonald (16412) · Garrity (16778) · Tonkin (5845)</div></div>
-      <button class="btn btn-green btn-xs" onclick="loadNewJobs2026()" id="newjobs-batch-btn" style="margin-left:auto">&#8595; Load jobs</button>
-    </div>
-    <div id="newjobs-batch-status" style="display:none;padding:8px 16px 12px;font-size:12px"></div>
-  </div>
-
-
-  <div class="card" id="aug2026b-batch-import-card">
-    <div class="card-head">
-      <div class="ch-icon" style="background:#fff0f0">&#128229;</div>
-      <div><div class="ch-title">Load Aug 2026 installs — batch B (7 jobs)</div><div class="ch-sub">Humpleby (13674) · Venison (17057) · Evans (13306) · Preston (16695) · Chamberlain (16748) · Saunders (16800) · Oldaker (16732)</div></div>
-      <button class="btn btn-green btn-xs" onclick="loadAug2026BatchB()" id="aug2026b-batch-btn" style="margin-left:auto">&#8595; Load jobs</button>
-    </div>
-    <div id="aug2026b-batch-status" style="display:none;padding:8px 16px 12px;font-size:12px"></div>
-  </div>
   <div class="card">
     <div class="card-head">
       <div class="ch-icon" style="background:#f0f4ff">🔍</div>
@@ -8139,11 +8094,22 @@ function renderBulkResults(results) {
 // Init on load
 bulkInit();
 
-// Auto-merge MAY2026_JOBS into localStorage — runs once per new job ref, silent
+// Auto-merge all job batches into localStorage on load — silent, ref-deduped
 (function() {
+  const allBatches = [
+    ...MAY2026_JOBS,
+    ...AUG2026_JOBS,
+    ...JUN2026_JOBS,
+    ...NEWJOBS2026,
+    ...AUG2026B_JOBS
+  ];
   let changed = false;
-  for (const job of MAY2026_JOBS) {
-    if (!JOBS.find(j => j.ref === job.ref)) {
+  for (const job of allBatches) {
+    const idx = JOBS.findIndex(j => j.ref === job.ref);
+    if (idx >= 0) {
+      JOBS[idx] = job; // keep data fresh if already present
+      changed = true;
+    } else {
       JOBS.push(job);
       changed = true;
     }
