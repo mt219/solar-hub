@@ -1901,6 +1901,12 @@ function load() {
     const c = localStorage.getItem('gguk_v9_cfg'); if(c) MCfg = Object.assign(MCfg, JSON.parse(c));
     if(MCfg.key) { gel('m-key').value = MCfg.key; gel('m-board').value = MCfg.boardId||''; }
   } catch(e) {}
+  // Auto-inject batch B jobs if not already present
+  let batchBChanged = false;
+  for (const job of AUG2026B_JOBS) {
+    if (!JOBS.find(j => j.ref === job.ref)) { JOBS.push(job); batchBChanged = true; }
+  }
+  if (batchBChanged) { try { localStorage.setItem('gguk_v9_jobs', JSON.stringify(JOBS)); } catch(e){} }
 }
 
 // ── GOOGLE DRIVE SYNC ─────────────────────────────────────
