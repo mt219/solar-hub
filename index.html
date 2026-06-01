@@ -2274,7 +2274,7 @@ function goSection(id) {
   if(n) n.classList.add('on');
   if(id==='stringplan') { autoApplyVocIsc(); spInit(); renderSP(); }
   if(id==='datasheets') { renderDSLib(); updateDSBadge(); }
-  if(id==='customer') { renderScaffQuotes(); }
+  if(id==='customer') { loadScaffQuotes(); renderScaffQuotes(); }
   if(id==='warranties') { renderWarrantyLib(); updateWarrantyBadge(); }
   if(id==='dno') { const dp=gel('dno-phase'); if(dp) dp.value=J.phase||'single'; syncDNO(); calcDNO(); }
   if(id==='generate') {
@@ -2344,7 +2344,7 @@ function refreshUI() {
 }
 
 function handleRoof(v) { J.roof=v; const ror=gel('roof-other-row'); if(ror) ror.style.display=v==='Other'?'block':'none'; }
-function newJob() { J=BLANK(); fillForm(); goSection('details'); }
+function newJob() { J=BLANK(); SCAFF_QUOTES=[]; fillForm(); goSection('details'); }
 
 // ════════════════════════════════════════════════════════════
 // SAVE / LOAD JOBS
@@ -2375,6 +2375,8 @@ function loadJob(id) {
   const f=JOBS.find(x=>x.id===id); if(!f) return;
   J=Object.assign(BLANK(), JSON.parse(JSON.stringify(f)));
   fillForm();
+  SCAFF_QUOTES=[];
+  loadScaffQuotes(); renderScaffQuotes();
   goSection('details');
 }
 
@@ -3119,7 +3121,7 @@ function renderScaffQuotes(){
   var accepted = SCAFF_QUOTES.filter(function(q){return q.accepted;});
   var html = SCAFF_QUOTES.map(function(q,i){
     var isAcc = q.accepted;
-    var cardStyle = 'border:1.5px solid;border-radius:10px;padding:12px 14px;margin-bottom:10px;'
+    var cardStyle = 'border:1.5px solid;border-radius:10px;padding:12px 14px;margin-bottom:10px;cursor:default;'
       + (isAcc ? 'background:#f0fdf4;border-color:#bbf7d0' : 'background:var(--bg);border-color:var(--bdr)');
     var accBadge = isAcc ? '<span style="font-size:10px;background:#166534;color:#fff;border-radius:5px;padding:2px 7px;font-weight:700">✓ ACCEPTED</span>' : '';
     var prefBadge = q.preferred ? '<span style="font-size:10px;background:#713f12;color:#fff;border-radius:5px;padding:2px 7px">⭐ Preferred</span>' : '';
@@ -3128,8 +3130,11 @@ function renderScaffQuotes(){
     var dateNote = q.date ? 'Received: '+q.date+' · ' : '';
     var notesTxt = q.notes ? esc(q.notes) : '';
     var acceptLbl = isAcc ? '✓ Accepted' : '✉ Accept &amp; email';
-    return '<div style="'+cardStyle+'">'
+    return '<div draggable="true" data-sq-idx="'+i+'" style="'+cardStyle+'">'
       +'<div style="display:flex;align-items:flex-start;gap:10px">'
+      +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:2px;cursor:grab;color:var(--ink3);user-select:none" title="Drag to reorder">'
+      +'<span style="font-size:16px;line-height:1">⠿</span>'
+      +'</div>'
       +'<div style="flex:1">'
       +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">'
       +'<span style="font-size:14px;font-weight:700;color:var(--ink)">'+esc(q.company)+'</span>'
@@ -3141,10 +3146,30 @@ function renderScaffQuotes(){
       +'<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">'
       +'<button class="btn btn-green btn-xs" onclick="acceptScaffQuote('+i+')" style="white-space:nowrap">'+acceptLbl+'</button>'
       +'<button class="btn btn-ghost btn-xs" onclick="editScaffQuote('+i+')">Edit</button>'
-      +'<button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="removeScaffQuote('+i+')">Remove</button>'
+      +'<button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="removeScaffQuote('+i+')">✕ Delete</button>'
       +'</div></div></div>';
   }).join('');
   el.innerHTML = html;
+  // Wire drag-and-drop reordering
+  var items = el.querySelectorAll('[data-sq-idx]');
+  var dragSrc = null;
+  items.forEach(function(item){
+    item.addEventListener('dragstart', function(e){
+      dragSrc = parseInt(item.dataset.sqIdx);
+      e.dataTransfer.effectAllowed='move';
+      item.style.opacity='0.5';
+    });
+    item.addEventListener('dragend', function(){ item.style.opacity=''; });
+    item.addEventListener('dragover', function(e){ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
+    item.addEventListener('drop', function(e){
+      e.preventDefault();
+      var dropTarget = parseInt(item.dataset.sqIdx);
+      if(dragSrc===null||dragSrc===dropTarget) return;
+      var moved = SCAFF_QUOTES.splice(dragSrc,1)[0];
+      SCAFF_QUOTES.splice(dropTarget,0,moved);
+      saveScaffQuotes(); renderScaffQuotes();
+    });
+  });
   if(tot){
     var lowest = Math.min.apply(null, SCAFF_QUOTES.map(function(q){return parseFloat(q.price||0);}));
     var count = SCAFF_QUOTES.length;
