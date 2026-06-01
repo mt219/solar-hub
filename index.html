@@ -6509,7 +6509,8 @@ try{ var _saved=localStorage.getItem('gguk_ct_v2'); if(_saved){ var _s=JSON.pars
 var CT_ARCHIVES = [];
 
 function ctLoad(){
-  try{ var d=localStorage.getItem('gguk_ct_v2'); if(d) CT_DATA=JSON.parse(d); }catch(e){}
+  // Merge localStorage into hardcoded seed data (user edits take priority, but seed always present)
+  try{ var d=localStorage.getItem('gguk_ct_v2'); if(d){ var _ls=JSON.parse(d); Object.keys(_ls).forEach(function(k){ CT_DATA[k]=_ls[k]; }); } }catch(e){}
   try{ var a=localStorage.getItem('gguk_ct_archives'); if(a) CT_ARCHIVES=JSON.parse(a); }catch(e){}
 }
 function ctSave(){
@@ -7111,18 +7112,8 @@ ctLoad();
   SCAFF_CONTACTS = SEED_CONTACTS;
   console.log('[Scaffold Seed] Loaded '+SEED_CONTACTS.length+' scaffold companies');
 
-  // Merge CT_DATA — always seed, preserving any extra data user has added
-  try{ var d=localStorage.getItem('gguk_ct_v2'); if(d) CT_DATA=JSON.parse(d); }catch(e){}
-  var added=0;
-  Object.keys(SEED_CT).forEach(function(ref){
-    if(!CT_DATA[ref]){ CT_DATA[ref]=SEED_CT[ref]; added++; }
-    // Also restore seed data if job exists but has no quotes
-    else if(!CT_DATA[ref].quotes || !Object.keys(CT_DATA[ref].quotes).length){
-      CT_DATA[ref]=SEED_CT[ref]; added++;
-    }
-  });
-  try{ localStorage.setItem('gguk_ct_v2', JSON.stringify(CT_DATA)); }catch(e){}
-  console.log('[Scaffold Seed] Seeded '+added+' jobs into cost tracker');
+  // CT_DATA already hardcoded at declaration — nothing to seed
+  console.log('[Scaffold Seed] CT_DATA already loaded inline');
 })();
 
 fillForm();
