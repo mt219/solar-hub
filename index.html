@@ -1179,6 +1179,15 @@ select.ei{cursor:pointer}
     <div id="newjobs-batch-status" style="display:none;padding:8px 16px 12px;font-size:12px"></div>
   </div>
 
+
+  <div class="card" id="aug2026b-batch-import-card">
+    <div class="card-head">
+      <div class="ch-icon" style="background:#fff0f0">&#128229;</div>
+      <div><div class="ch-title">Load Aug 2026 installs — batch B (7 jobs)</div><div class="ch-sub">Humpleby (13674) · Venison (17057) · Evans (13306) · Preston (16695) · Chamberlain (16748) · Saunders (16800) · Oldaker (16732)</div></div>
+      <button class="btn btn-green btn-xs" onclick="loadAug2026BatchB()" id="aug2026b-batch-btn" style="margin-left:auto">&#8595; Load jobs</button>
+    </div>
+    <div id="aug2026b-batch-status" style="display:none;padding:8px 16px 12px;font-size:12px"></div>
+  </div>
   <div class="card">
     <div class="card-head">
       <div class="ch-icon" style="background:#f0f4ff">🔍</div>
@@ -7551,6 +7560,156 @@ function loadNewJobs2026() {
   refreshUI();
   if (btn) { btn.textContent = '✅ Loaded'; btn.disabled = true; btn.style.background = '#155c30'; }
   if (status) { status.style.display = 'block'; status.style.color = '#1a6b3a'; status.innerHTML = '✅ ' + NEWJOBS2026.length + ' jobs loaded — ' + added + ' added, ' + updated + ' updated. Click <strong>All jobs</strong> above to see them.'; }
+}
+
+
+// ════════════════════════════════════════════════════════════════════
+// AUG 2026 BATCH B — 7 new install jobs
+// ════════════════════════════════════════════════════════════════════
+const AUG2026B_JOBS = [
+  {
+    id:5001, name:'Richard Humpleby', ref:'13674',
+    a1:'Chy Lowen, Gilly Lane', a2:'Whitecross', a3:'Cornwall', pc:'TR20 8BZ',
+    ph:'', em:'',
+    start:'2026-08-19', end:'2026-08-20',
+    hDate:'', hDno:'', type:'Solar PV only',
+    roof:'', roofOther:'', invloc:'Storage area at back of house (alongside existing inverter)',
+    mains:'', notes:'Detached bungalow. Single-phase supply. Existing PV array. New array on outbuilding. NG connection charge included. Renusol MetaSole+ mounting. Customer sorting ducting between inverter locations.',
+    scafUp:'2026-08-10', scafDown:'2026-08-12',
+    phase:'single', dnoRef:'', mpan:'',
+    pVoc:'41.1', pIsc:'14.35',
+    spGrid:null, spCols:8, spRows:4, mondayItemId:null,
+    staff:[{role:'Electrician',name:'Ben Bent'},{role:'Roofer',name:'Liam Clarke'},{role:'Roofer',name:'Lewis Wartnaby'}],
+    panels:[{brand:'Aiko',model:'Neostar 3s N-Type All-Black',wp:'490',qty:'10'}],
+    inverters:[{brand:'Solax',model:'3.6kW G4 Boost Dual MPPT',kw:'3.6',strings:2}],
+    batteries:[], evChargers:[], layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null
+  },
+  {
+    id:5002, name:'Nicola Venison', ref:'17057',
+    a1:'Featherbeds Farm', a2:'Idless', a3:'Cornwall', pc:'TR4 9QR',
+    ph:'', em:'nicola.venison@yahoo.co.uk',
+    start:'2026-08-24', end:'2026-08-25',
+    hDate:'', hDno:'', type:'Solar PV + battery',
+    roof:'', roofOther:'', invloc:'', mains:'',
+    notes:'14 x Aiko 490W panels. Tesla Powerwall 3.0 set to 6kW + Tesla Backup Gateway. Pre-installation survey booked 29 June, arrival 8-10am.',
+    scafUp:'2026-08-17', scafDown:'2026-08-19',
+    phase:'single', dnoRef:'', mpan:'',
+    pVoc:'41.1', pIsc:'14.35',
+    spGrid:null, spCols:8, spRows:4, mondayItemId:null,
+    staff:[{role:'Electrician',name:'Zakk Stidwell'},{role:'Roofer',name:'Ian Craze'},{role:'Roofer',name:'Simon Bullock'}],
+    panels:[{brand:'Aiko',model:'Neostar 3S All-Black',wp:'490',qty:'14'}],
+    inverters:[{brand:'Tesla',model:'Powerwall 3',kw:'5',strings:1}],
+    batteries:[{brand:'Tesla',model:'Powerwall 3',kwh:'13.5'}],
+    evChargers:[], layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null
+  },
+  {
+    id:5003, name:'Christine Evans', ref:'13306',
+    a1:'4 Portland Avenue', a2:'Teignmouth', a3:'Devon', pc:'TQ14 8RR',
+    ph:'07715 490686', em:'cae58@outlook.com',
+    start:'2026-08-24', end:'2026-08-25',
+    hDate:'', hDno:'', type:'Solar PV + battery',
+    roof:'', roofOther:'', invloc:'Garage (consumer unit and battery location)',
+    mains:'', notes:'11 x 480W Aiko Neostar 3S all-black panels. 5kW Fox hybrid inverter. Fox EP12 11.52kWh battery. Bird mesh included. Also has ASHP install (6kW Mitsubishi Ecodan R290 + 250L Telford cylinder + 2 radiator upgrades) — SPV record only. BUS application needed. DNO/handover required.',
+    scafUp:'2026-08-17', scafDown:'2026-08-19',
+    phase:'single', dnoRef:'', mpan:'',
+    pVoc:'41.1', pIsc:'14.35',
+    spGrid:null, spCols:8, spRows:4, mondayItemId:null,
+    staff:[{role:'Electrician',name:'Jake Pearce'},{role:'Roofer',name:'Jack Edwards'},{role:'Roofer',name:'John Dunn'}],
+    panels:[{brand:'Aiko',model:'Neostar 3S All-Black',wp:'480',qty:'11'}],
+    inverters:[{brand:'Fox ESS',model:'Gen 2 Hybrid 5kW',kw:'5',strings:2}],
+    batteries:[{brand:'Fox ESS',model:'EP12',kwh:'11.52'}],
+    evChargers:[], layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null
+  },
+  {
+    id:5004, name:'John Preston', ref:'16695',
+    a1:'Lower Chilcott Farm', a2:'', a3:'Devon', pc:'',
+    ph:'', em:'jhp2955@gmail.com',
+    start:'2026-08-25', end:'2026-08-27',
+    hDate:'', hDno:'', type:'Solar PV + battery + EV charger',
+    roof:'', roofOther:'', invloc:'', mains:'',
+    notes:'13 x 490W Aiko Neostar 3S panels. Fox ESS 5kW Gen 2 hybrid inverter. Fox EP12 11.52kWh battery + Backup Box. MyEnergi GLO 7kW EV charger. Panels southeast-facing. 10-year finance approved. G99 DNO application outstanding. ⚠ No signed order found in emails — booking on verbal intent only, confirm signed order before install.',
+    scafUp:'2026-08-17', scafDown:'2026-08-19',
+    phase:'single', dnoRef:'', mpan:'',
+    pVoc:'41.1', pIsc:'14.35',
+    spGrid:null, spCols:8, spRows:4, mondayItemId:null,
+    staff:[{role:'Electrician',name:'Cameron Brown'},{role:'Roofer',name:'Ian Craze'},{role:'Roofer',name:'Simon Bullock'}],
+    panels:[{brand:'Aiko',model:'Neostar 3S All-Black',wp:'490',qty:'13'}],
+    inverters:[{brand:'Fox ESS',model:'Gen 2 Hybrid 5kW',kw:'5',strings:2}],
+    batteries:[{brand:'Fox ESS',model:'EP12 + Backup Box',kwh:'11.52'}],
+    evChargers:[{brand:'MyEnergi',model:'GLO 7kW',kw:'7'}],
+    layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null
+  },
+  {
+    id:5005, name:'Anton Chamberlain', ref:'16748',
+    a1:'Perran Cottage, Budock Vean Lane', a2:'Mawnan Smith, Falmouth', a3:'Cornwall', pc:'TR11 5LQ',
+    ph:'', em:'',
+    start:'2026-08-25', end:'2026-08-27',
+    hDate:'', hDno:'', type:'Solar PV + battery',
+    roof:'Concrete tile', roofOther:'', invloc:'TBC',
+    mains:'', notes:'Detached bungalow. Single-phase. Existing PV system on FIT. South-facing roof. 2 x 6 portrait array. Tesla Powerwall 3 with Gateway. Renusol VarioSole+ mounting. EnviroGuard bird mesh. G99 sent.',
+    scafUp:'2026-08-17', scafDown:'2026-08-19',
+    phase:'single', dnoRef:'', mpan:'',
+    pVoc:'41.1', pIsc:'14.35',
+    spGrid:null, spCols:8, spRows:4, mondayItemId:null,
+    staff:[{role:'Electrician',name:'Adam Oliver'},{role:'Roofer',name:'Jack Edwards'},{role:'Roofer',name:'Orley Stidwell'}],
+    panels:[{brand:'Aiko',model:'Neostar 3s N-Type All-Black',wp:'490',qty:'12'}],
+    inverters:[{brand:'Tesla',model:'Powerwall 3',kw:'5',strings:1}],
+    batteries:[{brand:'Tesla',model:'Powerwall 3',kwh:'13.5'}],
+    evChargers:[], layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null
+  },
+  {
+    id:5006, name:'Richard Saunders', ref:'16800',
+    a1:'Tremalik', a2:'Trehunist', a3:'Cornwall', pc:'PL14 3SD',
+    ph:'07854 945875', em:'tremalik@gmail.com',
+    start:'2026-08-26', end:'2026-08-28',
+    hDate:'', hDno:'', type:'Solar PV + battery + EV charger',
+    roof:'', roofOther:'', invloc:'Utility room / rear of utility',
+    mains:'', notes:'12 x 480W Aiko Neostar 3S panels split east/west. Tesla Powerwall 3 + Backup Gateway. MyEnergi Zappi GLO 7kW + Harvi. Consumer unit in utility room. Battery to rear of utility beneath ASHP location. GLO charger on front wall. Also has ASHP install (10kW Ecodan R290 coastal) — SPV record only. BUS application needed. DNO/G99 submitted. Referred by Debbie Stoneman.',
+    scafUp:'2026-08-17', scafDown:'2026-08-19',
+    phase:'single', dnoRef:'', mpan:'',
+    pVoc:'41.1', pIsc:'14.35',
+    spGrid:null, spCols:8, spRows:4, mondayItemId:null,
+    staff:[{role:'Electrician',name:'John Dunn'},{role:'Electrician',name:'Cameron Brown'},{role:'Roofer',name:'Ian Craze'},{role:'Roofer',name:'Simon Bullock'}],
+    panels:[{brand:'Aiko',model:'Neostar 3S All-Black',wp:'480',qty:'12'}],
+    inverters:[{brand:'Tesla',model:'Powerwall 3',kw:'5',strings:1}],
+    batteries:[{brand:'Tesla',model:'Powerwall 3',kwh:'13.5'}],
+    evChargers:[{brand:'MyEnergi',model:'Zappi GLO 7kW',kw:'7'}],
+    layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null
+  },
+  {
+    id:5007, name:'Richard Oldaker', ref:'16732',
+    a1:'', a2:'', a3:'Devon', pc:'',
+    ph:'', em:'',
+    start:'2026-08-27', end:'2026-08-28',
+    hDate:'', hDno:'', type:'Solar PV + battery',
+    roof:'', roofOther:'', invloc:'', mains:'',
+    notes:'9 x Aiko panels. Mitsubishi Ecodan ASHP + SPV combined project. ⚠ Bat survey concern raised by Cameron 26/05/26 — customer says bats previously present but cannot confirm 100% clear. Confirm bat status before install. Also has ASHP install — SPV record only.',
+    scafUp:'2026-08-17', scafDown:'2026-08-19',
+    phase:'single', dnoRef:'', mpan:'',
+    pVoc:'41.1', pIsc:'14.35',
+    spGrid:null, spCols:8, spRows:4, mondayItemId:null,
+    staff:[{role:'Electrician',name:'Jake Pearce'},{role:'Roofer',name:'Jack Edwards'},{role:'Roofer',name:'Orley Stidwell'}],
+    panels:[{brand:'Aiko',model:'Neostar 3S All-Black',wp:'490',qty:'9'}],
+    inverters:[{brand:'Fox ESS',model:'Gen 2 Hybrid',kw:'5',strings:2}],
+    batteries:[{brand:'Fox ESS',model:'EP12',kwh:'11.52'}],
+    evChargers:[], layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null
+  }
+];
+
+function loadAug2026BatchB() {
+  const btn = document.getElementById('aug2026b-batch-btn');
+  const status = document.getElementById('aug2026b-batch-status');
+  let added = 0, updated = 0;
+  for (const job of AUG2026B_JOBS) {
+    const idx = JOBS.findIndex(j => j.ref === job.ref);
+    if (idx >= 0) { JOBS[idx] = job; updated++; }
+    else { JOBS.push(job); added++; }
+  }
+  save();
+  renderSaved();
+  refreshUI();
+  if (btn) { btn.textContent = '✅ Loaded'; btn.disabled = true; btn.style.background = '#155c30'; }
+  if (status) { status.style.display = 'block'; status.style.color = '#1a6b3a'; status.innerHTML = '✅ ' + AUG2026B_JOBS.length + ' jobs loaded — ' + added + ' added, ' + updated + ' updated. Click <strong>All jobs</strong> above to see them.'; }
 }
 
 // ════════════════════════════════════════════════════════════════════
