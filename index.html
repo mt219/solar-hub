@@ -5,7 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>GreenGenUK · Solar PV Hub v41</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,700;0,800;1,700&family=Dancing+Script:wght@700&family=Caveat:wght@600&family=Pacifico&display=swap" rel="stylesheet">
-<!-- Supabase removed - running standalone -->
+<!-- Supabase -->
+<script>
+// Stub supabase so app never crashes if CDN fails
+window.supabase = { createClient: function() { return { from: function() { return { select: function() { return Promise.resolve({data:[], error:null}); }, insert: function() { return Promise.resolve({data:null,error:null}); }, upsert: function() { return Promise.resolve({data:null,error:null}); }, delete: function() { return Promise.resolve({data:null,error:null}); }, order: function() { return this; }, limit: function() { return this; } }; }, channel: function() { return { on: function() { return this; }, subscribe: function() {} }; }, auth: { getSession: function() { return Promise.resolve({data:{session:null}}); } } }; } };
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
