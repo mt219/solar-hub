@@ -2324,7 +2324,7 @@ function saveJob() {
 }
 
 function loadJob(id) {
-  const f=JOBS.find(x=>x.id===id); if(!f) return;
+  const f=JOBS.find(x=>x.id===id||x.id===+id||String(x.id)===String(id)); if(!f) return;
   J=Object.assign(BLANK(), JSON.parse(JSON.stringify(f)));
   fillForm();
   SCAFF_QUOTES=[];
@@ -7112,7 +7112,7 @@ load();
 (function seedAugustJobs() {
   const seed = [
     {
-      id: 1001300001,
+      id: 1748000001000,
       ref: '13674', name: 'Richard Humpleby',
       a1: 'Chy Lowen', a2: 'Gilly Lane', a3: 'Whitecross', pc: 'TR20 8BZ', ph: '', em: '',
       start: '2026-08-19', end: '2026-08-20',
@@ -7133,7 +7133,7 @@ load();
       hDate:'', hDno:'', enaRefs:{}, layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null, contractValue:0
     },
     {
-      id: 1001700057,
+      id: 1748000002000,
       ref: '17057', name: 'Nicola Venison',
       a1: 'Featherbeds Farm', a2: 'Idless', a3: 'Truro', pc: 'TR4 9QR', ph: '07488317529', em: 'nicola.venison@yahoo.co.uk',
       start: '2026-08-24', end: '2026-08-25',
@@ -7154,7 +7154,7 @@ load();
       hDate:'', hDno:'', enaRefs:{}, layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null, contractValue:0
     },
     {
-      id: 1001330006,
+      id: 1748000003000,
       ref: '13306', name: 'Christine Evans',
       a1: '4 Portland Avenue', a2: '', a3: 'Teignmouth', pc: 'TQ14 8RR', ph: '07715490686', em: 'cae58@outlook.com',
       start: '2026-08-24', end: '2026-08-25',
@@ -7175,7 +7175,7 @@ load();
       hDate:'', hDno:'', enaRefs:{}, layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null, contractValue:0
     },
     {
-      id: 1001669500,
+      id: 1748000004000,
       ref: '16695', name: 'John Preston',
       a1: '', a2: '', a3: '', pc: '', ph: '', em: '',
       start: '2026-08-25', end: '2026-08-26',
@@ -7196,7 +7196,7 @@ load();
       hDate:'', hDno:'', enaRefs:{}, layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null, contractValue:0
     },
     {
-      id: 1001674800,
+      id: 1748000005000,
       ref: '16748', name: 'Anton Chamberlain',
       a1: 'Perran Cottage', a2: 'Budock Vean Lane', a3: 'Mawnan Smith, Falmouth', pc: 'TR11 5LQ', ph: '', em: '',
       start: '2026-08-25', end: '2026-08-27',
@@ -7217,7 +7217,7 @@ load();
       hDate:'', hDno:'', enaRefs:{}, layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null, contractValue:0
     },
     {
-      id: 1001680000,
+      id: 1748000006000,
       ref: '16800', name: 'Richard Saunders',
       a1: 'Tremalik', a2: 'Trehunist', a3: 'Liskeard', pc: 'PL14 3SD', ph: '07854945875', em: 'tremalik@gmail.com',
       start: '2026-08-26', end: '2026-08-28',
@@ -7238,7 +7238,7 @@ load();
       hDate:'', hDno:'', enaRefs:{}, layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null, contractValue:0
     },
     {
-      id: 1001642200,
+      id: 1748000007000,
       ref: '16422', name: 'Powell\'s Garage',
       a1: '', a2: '', a3: '', pc: '', ph: '', em: 'heather@powellsgarage.co.uk',
       start: '2026-08-29', end: '2026-08-30',
@@ -7258,7 +7258,7 @@ load();
       hDate:'', hDno:'', enaRefs:{}, layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null, contractValue:0
     },
     {
-      id: 1001673200,
+      id: 1748000008000,
       ref: '16732', name: 'Richard Oldaker',
       a1: '', a2: '', a3: '', pc: '', ph: '', em: '',
       start: '2026-08-27', end: '2026-08-28',
@@ -7292,6 +7292,8 @@ load();
     try { localStorage.setItem('gguk_v9_jobs', JSON.stringify(JOBS)); } catch(e) {}
     console.log(`[Seed] Added ${added} August 2026 jobs`);
   }
+  // Always re-render saved list in case jobs were just seeded
+  setTimeout(() => { try { renderSaved(); } catch(e) {} }, 0);
 })();
 // ── END AUGUST SEED ──────────────────────────────────────
 
