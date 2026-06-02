@@ -7107,8 +7107,9 @@ function ctBuildArchiveHTML(quarter, jobs, companies){
 load();
 
 // ── AUGUST 2026 JOB SEED ─────────────────────────────────
-// Auto-inserts August install block jobs if not already present.
-// Matched by ref — safe to re-run (idempotent).
+// Upserts August install block — always overwrites seeded jobs with correct data.
+// Safe: only removes jobs whose IDs are in the seed set (1748000001000–1748000008000).
+// Preserves user progress (dnoRef, hDate, images) by merging over the seed base.
 (function seedAugustJobs() {
   const seed = [
     {
@@ -7117,17 +7118,12 @@ load();
       a1: 'Chy Lowen', a2: 'Gilly Lane', a3: 'Whitecross', pc: 'TR20 8BZ', ph: '', em: '',
       start: '2026-08-19', end: '2026-08-20',
       scafUp: '2026-08-11', scafDown: '2026-08-29',
-      type: 'SPV3', roof: 'other', roofOther: 'Outbuilding roof',
+      type: 'Solar PV only', roof: 'Other', roofOther: 'Outbuilding roof',
       notes: 'Existing PV array on site. New array onto outbuilding. Inverter in storage area at rear. Customer sorting ducting. NG connection charge included.',
       panels: [{brand:'AIKO',model:'Neostar 3S 490W N-Type All Black',wp:'490',qty:'10'}],
       inverters: [{brand:'Solax',model:'3.6kW G4 Boost Dual MPPT',kw:'3.6',strings:2}],
-      batteries: [],
-      evChargers: [],
-      staff: [
-        {role:'Electrician', name:'Ben Bent'},
-        {role:'Electrician', name:'Liam Clarke'},
-        {role:'Roofer', name:'Lewis Wartnaby'}
-      ],
+      batteries: [], evChargers: [],
+      staff: [{role:'Electrician',name:'Ben Bent'},{role:'Electrician',name:'Liam Clarke'},{role:'Roofer',name:'Lewis Wartnaby'}],
       phase:'single', invloc:'Storage area at rear of house', mains:'', dnoRef:'', mpan:'',
       pVoc:'', pIsc:'', spGrid:null, spCols:8, spRows:4, mondayItemId:null,
       hDate:'', hDno:'', enaRefs:{}, layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null, contractValue:0
@@ -7138,16 +7134,12 @@ load();
       a1: 'Featherbeds Farm', a2: 'Idless', a3: 'Truro', pc: 'TR4 9QR', ph: '07488317529', em: 'nicola.venison@yahoo.co.uk',
       start: '2026-08-24', end: '2026-08-25',
       scafUp: '2026-08-18', scafDown: '2026-09-04',
+      type: 'Solar PV + battery', roof: 'Other', roofOther: 'Corrugated metal outbuilding',
       notes: 'Pre-install visit booked 29 Jun, arrival 8-10am. Battery in outer building. Tesla Gateway back at house — customer to do trenching. NG application pending.',
       panels: [{brand:'AIKO',model:'Neostar 3S 490W',wp:'490',qty:'14'}],
       inverters: [{brand:'Tesla',model:'Powerwall 3 (5kW inverter)',kw:'5',strings:1}],
-      batteries: [{brand:'Tesla',model:'Powerwall 3',kwh:'13.5'}],
-      evChargers: [],
-      staff: [
-        {role:'Electrician', name:'Zakk Stidwell'},
-        {role:'Roofer', name:'Ian Craze'},
-        {role:'Roofer', name:'Simon Bullock'}
-      ],
+      batteries: [{brand:'Tesla',model:'Powerwall 3',kwh:'13.5'}], evChargers: [],
+      staff: [{role:'Electrician',name:'Zakk Stidwell'},{role:'Roofer',name:'Ian Craze'},{role:'Roofer',name:'Simon Bullock'}],
       phase:'single', invloc:'Outer building', mains:'', dnoRef:'', mpan:'',
       pVoc:'', pIsc:'', spGrid:null, spCols:8, spRows:4, mondayItemId:null,
       hDate:'', hDno:'', enaRefs:{}, layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null, contractValue:0
@@ -7158,18 +7150,13 @@ load();
       a1: '4 Portland Avenue', a2: '', a3: 'Teignmouth', pc: 'TQ14 8RR', ph: '07715490686', em: 'cae58@outlook.com',
       start: '2026-08-24', end: '2026-08-25',
       scafUp: '2026-08-18', scafDown: '2026-09-04',
-      type: 'SPV3', roof: 'tile', roofOther: '',
-      notes: 'SPV3 only — also has ASHP3 on same job. Bird mesh included. Consumer unit in garage (right side of building). Battery and inverter in garage. BUS application needed.',
+      type: 'Solar PV + battery', roof: 'Other', roofOther: 'Also has ASHP3 on same job',
+      notes: 'SPV3 only for this booking — also has ASHP3. Bird mesh included. Consumer unit in garage (right side of building). Battery and inverter in garage. BUS application needed.',
       panels: [{brand:'AIKO',model:'Neostar 3S 480W All Black',wp:'480',qty:'11'}],
       inverters: [{brand:'Fox ESS',model:'5kW Hybrid Inverter',kw:'5',strings:2}],
-      batteries: [{brand:'Fox ESS',model:'EP12 11.52kWh',kwh:'11.52'}],
-      evChargers: [],
-      staff: [
-        {role:'Electrician', name:'Jake Pearce'},
-        {role:'Roofer', name:'Jack Edwards'},
-        {role:'Roofer', name:'John Dunn'}
-      ],
-      phase:'single', invloc:'Garage (right side)', mains:'', dnoRef:'', mpan:'',
+      batteries: [{brand:'Fox ESS',model:'EP12 11.52kWh',kwh:'11.52'}], evChargers: [],
+      staff: [{role:'Electrician',name:'Jake Pearce'},{role:'Roofer',name:'Jack Edwards'},{role:'Roofer',name:'John Dunn'}],
+      phase:'single', invloc:'Garage (right side of building)', mains:'', dnoRef:'', mpan:'',
       pVoc:'', pIsc:'', spGrid:null, spCols:8, spRows:4, mondayItemId:null,
       hDate:'', hDno:'', enaRefs:{}, layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null, contractValue:0
     },
@@ -7179,17 +7166,13 @@ load();
       a1: '', a2: '', a3: '', pc: '', ph: '', em: '',
       start: '2026-08-25', end: '2026-08-26',
       scafUp: '2026-08-18', scafDown: '2026-09-04',
-      type: 'SPV2', roof: 'other', roofOther: '',
+      type: 'Solar PV + battery + EV charger', roof: 'Other', roofOther: 'TBC',
       notes: 'Panels front aspect, inverter/battery external rear. EV charger ~20m from property — trenching not included. Hometree Finance. G99 submitted. 1-phase supply rear left.',
       panels: [{brand:'AIKO',model:'Neostar 3S 480W All Black',wp:'480',qty:'14'}],
       inverters: [{brand:'Fox ESS',model:'Gen 2 5kW Hybrid Inverter',kw:'5',strings:2}],
       batteries: [{brand:'Fox ESS',model:'EP12 11.52kWh',kwh:'11.52'}],
       evChargers: [{brand:'Myenergi',model:'GLO 7kW EV Charger',kw:'7'}],
-      staff: [
-        {role:'Electrician', name:'Jake Pearce'},
-        {role:'Roofer', name:'Ian Craze'},
-        {role:'Roofer', name:'Simon Bullock'}
-      ],
+      staff: [{role:'Electrician',name:'Jake Pearce'},{role:'Roofer',name:'Ian Craze'},{role:'Roofer',name:'Simon Bullock'}],
       phase:'single', invloc:'External rear wall', mains:'', dnoRef:'', mpan:'',
       pVoc:'', pIsc:'', spGrid:null, spCols:8, spRows:4, mondayItemId:null,
       hDate:'', hDno:'', enaRefs:{}, layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null, contractValue:0
@@ -7197,20 +7180,15 @@ load();
     {
       id: 1748000005000,
       ref: '16748', name: 'Anton Chamberlain',
-      a1: 'Perran Cottage', a2: 'Budock Vean Lane', a3: 'Mawnan Smith, Falmouth', pc: 'TR11 5LQ', ph: '', em: '',
+      a1: 'Perran Cottage', a2: 'Budock Vean Lane', a3: 'Mawnan Smith', pc: 'TR11 5LQ', ph: '', em: '',
       start: '2026-08-25', end: '2026-08-27',
       scafUp: '2026-08-18', scafDown: '2026-09-04',
-      type: 'SPV2', roof: 'tile', roofOther: 'Concrete tile',
+      type: 'Solar PV + battery', roof: 'Concrete tile', roofOther: '',
       notes: 'South-facing, 2x6 portrait array (12 panels). Existing FIT PV system on site. Inverter/battery location TBC. G99 sent. Bird mesh included.',
       panels: [{brand:'AIKO',model:'Neostar 3S 490W All Black',wp:'490',qty:'12'}],
       inverters: [{brand:'Tesla',model:'Powerwall 3 (5kW inverter)',kw:'5',strings:1}],
-      batteries: [{brand:'Tesla',model:'Powerwall 3 13.5kWh',kwh:'13.5'}],
-      evChargers: [],
-      staff: [
-        {role:'Electrician', name:'Adam Oliver'},
-        {role:'Roofer', name:'Jack Edwards'},
-        {role:'Roofer', name:'Ordley Stidwell'}
-      ],
+      batteries: [{brand:'Tesla',model:'Powerwall 3 13.5kWh',kwh:'13.5'}], evChargers: [],
+      staff: [{role:'Electrician',name:'Adam Oliver'},{role:'Roofer',name:'Jack Edwards'},{role:'Roofer',name:'Ordley Stidwell'}],
       phase:'single', invloc:'TBC — internal or external wall', mains:'', dnoRef:'', mpan:'',
       pVoc:'', pIsc:'', spGrid:null, spCols:8, spRows:4, mondayItemId:null,
       hDate:'', hDno:'', enaRefs:{}, layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null, contractValue:0
@@ -7221,37 +7199,29 @@ load();
       a1: 'Tremalik', a2: 'Trehunist', a3: 'Liskeard', pc: 'PL14 3SD', ph: '07854945875', em: 'tremalik@gmail.com',
       start: '2026-08-26', end: '2026-08-28',
       scafUp: '2026-08-18', scafDown: '2026-09-04',
-      type: 'SPV1', roof: 'other', roofOther: 'East/west split',
-      notes: 'SPV1 only for this booking — also has ASHP2 + EVC1. 12 panels split E+W. Customer may want 2-4 additional panels pending NG. Tesla to rear of utility. Also has: 7kW Zappi GLO EVC + Harvi. BUS grant (oil). G99 submitted by Ned.',
+      type: 'Solar PV + battery + EV charger', roof: 'Other', roofOther: 'East/west split panels',
+      notes: 'SPV1 for this booking — also has ASHP2 + EVC1. 12 panels split E+W. Customer may want 2-4 additional panels pending NG. Tesla to rear of utility. Also: 7kW Zappi GLO EVC + Harvi. BUS grant (oil). G99 submitted by Ned.',
       panels: [{brand:'AIKO',model:'Neostar 3S 480W',wp:'480',qty:'12'}],
       inverters: [{brand:'Tesla',model:'Powerwall 3 (5kW inverter)',kw:'5',strings:1}],
       batteries: [{brand:'Tesla',model:'Powerwall 3 13.5kWh',kwh:'13.5'}],
       evChargers: [{brand:'Myenergi',model:'Zappi GLO 7kW',kw:'7'}],
-      staff: [
-        {role:'Electrician', name:'Cameron Brown'},
-        {role:'Roofer', name:'Ian Craze'},
-        {role:'Roofer', name:'Simon Bullock'}
-      ],
+      staff: [{role:'Electrician',name:'Cameron Brown'},{role:'Roofer',name:'Ian Craze'},{role:'Roofer',name:'Simon Bullock'}],
       phase:'single', invloc:'Rear of utility room', mains:'', dnoRef:'', mpan:'',
       pVoc:'', pIsc:'', spGrid:null, spCols:8, spRows:4, mondayItemId:null,
       hDate:'', hDno:'', enaRefs:{}, layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null, contractValue:0
     },
     {
       id: 1748000007000,
-      ref: '16422', name: 'Powell\'s Garage',
+      ref: '16422', name: "Powell's Garage",
       a1: '', a2: '', a3: '', pc: '', ph: '', em: 'heather@powellsgarage.co.uk',
       start: '2026-08-29', end: '2026-08-30',
       scafUp: '', scafDown: '',
-      type: 'SPV', roof: 'other', roofOther: 'Commercial — no scaffold required',
+      type: 'Solar PV + battery', roof: 'Other', roofOther: 'Commercial — no scaffold required',
       notes: 'Commercial install. No scaffold required. Roof and first-fix electrical completed prior to install. Contact: heather@powellsgarage.co.uk',
       panels: [{brand:'AIKO',model:'Neostar 3S 475W All Black Gen 3',wp:'475',qty:'15'}],
       inverters: [{brand:'Tesla',model:'Powerwall 3 (6kW inverter)',kw:'6',strings:1}],
-      batteries: [{brand:'Tesla',model:'Powerwall 3 13.5kWh',kwh:'13.5'}],
-      evChargers: [],
-      staff: [
-        {role:'Electrician', name:'Cameron Brown'},
-        {role:'Roofer', name:'Jack Edwards'}
-      ],
+      batteries: [{brand:'Tesla',model:'Powerwall 3 13.5kWh',kwh:'13.5'}], evChargers: [],
+      staff: [{role:'Electrician',name:'Cameron Brown'},{role:'Roofer',name:'Jack Edwards'}],
       phase:'single', invloc:'TBC', mains:'', dnoRef:'', mpan:'',
       pVoc:'', pIsc:'', spGrid:null, spCols:8, spRows:4, mondayItemId:null,
       hDate:'', hDno:'', enaRefs:{}, layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null, contractValue:0
@@ -7262,36 +7232,45 @@ load();
       a1: '', a2: '', a3: '', pc: '', ph: '', em: '',
       start: '2026-08-27', end: '2026-08-28',
       scafUp: '2026-08-18', scafDown: '2026-09-04',
-      type: 'SPV2', roof: 'other', roofOther: '',
+      type: 'Solar PV only', roof: 'Other', roofOther: 'TBC',
       notes: 'SPV2 only for this booking — also has ASHP2. 12 panels confirmed. Bat survey previously flagged — confirmed cleared by Cameron (no bats currently present). New fuse board required (included in scope). Inverter/battery on external wall near heat pump location.',
       panels: [{brand:'AIKO',model:'Neostar 3S',wp:'',qty:'12'}],
       inverters: [{brand:'',model:'TBC',kw:'',strings:2}],
-      batteries: [],
-      evChargers: [],
-      staff: [
-        {role:'Electrician', name:'Jake Pearce'},
-        {role:'Roofer', name:'Jack Edwards'},
-        {role:'Roofer', name:'Ordley Stidwell'}
-      ],
+      batteries: [], evChargers: [],
+      staff: [{role:'Electrician',name:'Jake Pearce'},{role:'Roofer',name:'Jack Edwards'},{role:'Roofer',name:'Ordley Stidwell'}],
       phase:'single', invloc:'External wall near heat pump — new fuse board included', mains:'', dnoRef:'', mpan:'',
       pVoc:'', pIsc:'', spGrid:null, spCols:8, spRows:4, mondayItemId:null,
       hDate:'', hDno:'', enaRefs:{}, layoutImg:null, scaffImg:null, scaffName:null, aerialImg:null, contractValue:0
     }
   ];
 
-  const existingRefs = new Set(JOBS.map(j => j.ref));
-  let added = 0;
-  seed.forEach(job => {
-    if (!existingRefs.has(job.ref)) {
-      JOBS.push(job);
-      added++;
+  const SEED_IDS = new Set(seed.map(j => j.id));
+  // Upsert: for each seeded job, merge over any existing entry to preserve user progress
+  seed.forEach(fresh => {
+    const idx = JOBS.findIndex(j => j.id === fresh.id || j.ref === fresh.ref);
+    if (idx >= 0) {
+      const existing = JOBS[idx];
+      // Preserve any user-entered progress fields
+      const preserved = {
+        dnoRef: existing.dnoRef || fresh.dnoRef,
+        mpan: existing.mpan || fresh.mpan,
+        hDate: existing.hDate || fresh.hDate,
+        hDno: existing.hDno || fresh.hDno,
+        layoutImg: existing.layoutImg || fresh.layoutImg,
+        scaffImg: existing.scaffImg || fresh.scaffImg,
+        aerialImg: existing.aerialImg || fresh.aerialImg,
+        enaRefs: existing.enaRefs || fresh.enaRefs,
+        mondayItemId: existing.mondayItemId || fresh.mondayItemId,
+        pVoc: existing.pVoc || fresh.pVoc,
+        pIsc: existing.pIsc || fresh.pIsc,
+      };
+      JOBS[idx] = Object.assign({}, fresh, preserved);
+    } else {
+      JOBS.push(fresh);
     }
   });
-  if (added > 0) {
-    try { localStorage.setItem('gguk_v9_jobs', JSON.stringify(JOBS)); } catch(e) {}
-    console.log(`[Seed] Added ${added} August 2026 jobs`);
-  }
-  // Always re-render saved list in case jobs were just seeded
+  try { localStorage.setItem('gguk_v9_jobs', JSON.stringify(JOBS)); } catch(e) {}
+  console.log('[Seed] August 2026 jobs upserted');
   setTimeout(() => { try { renderSaved(); } catch(e) {} }, 0);
 })();
 // ── END AUGUST SEED ──────────────────────────────────────
