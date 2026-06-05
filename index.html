@@ -1501,8 +1501,11 @@ select.ei{cursor:pointer}
 <!-- ═══════════════════ INSTALL TRACKER & KPIs ═══════════════════ -->
 <div class="section" id="s-kpi">
   <div class="page-header">
-    <div class="page-title">Install tracker &amp; KPIs</div>
-    <div class="page-sub">Sign off installs · paste completed lists · track throughput · Monday morning review</div>
+    <div>
+      <div class="page-title">Install tracker &amp; KPIs</div>
+      <div class="page-sub">Sign off installs · paste completed lists · track throughput · Monday morning review</div>
+    </div>
+    <button class="btn btn-ghost btn-xs" onclick="openKPIGoals()" style="margin-left:auto;white-space:nowrap">⚙️ Set goals</button>
   </div>
 
   <!-- KPI METRIC STRIP -->
@@ -1636,6 +1639,40 @@ Ref 12196 (Jenny Roe) done 16 May, Fox ESS, on time
 
 </div><!-- /main -->
 </div><!-- /body-wrap -->
+
+<!-- KPI GOALS MODAL -->
+<div class="modal-bg" id="kpi-goals-modal" onclick="if(event.target===this)closeKPIGoals()">
+  <div class="modal" style="width:480px;max-width:96vw">
+    <div class="modal-title">⚙️ KPI &amp; Revenue Goals</div>
+    <p style="font-size:13px;color:var(--ink3);margin-bottom:18px;line-height:1.6">Set your department targets. These drive the metric cards and chart thresholds.</p>
+    <div class="fg2" style="gap:14px">
+      <div class="fld">
+        <label>Weekly install target (installs/week)</label>
+        <input class="inp" type="number" id="goal-weekly-installs" min="1" max="30" placeholder="e.g. 5">
+      </div>
+      <div class="fld">
+        <label>Max acceptable overrun rate (%)</label>
+        <input class="inp" type="number" id="goal-overrun-pct" min="0" max="100" placeholder="e.g. 20">
+      </div>
+      <div class="fld">
+        <label>Annual revenue target (£)</label>
+        <input class="inp" type="number" id="goal-annual-revenue" min="0" placeholder="e.g. 2000000">
+      </div>
+      <div class="fld">
+        <label>Weekly kWp target (kWp/week)</label>
+        <input class="inp" type="number" id="goal-weekly-kwp" min="0" placeholder="e.g. 20">
+      </div>
+      <div class="fld">
+        <label>Weekly kWh battery target (kWh/week)</label>
+        <input class="inp" type="number" id="goal-weekly-kwh" min="0" placeholder="e.g. 50">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn btn-green" onclick="saveKPIGoals()">💾 Save goals</button>
+      <button class="btn btn-ghost" onclick="closeKPIGoals()">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <!-- PANEL LOOKUP MODAL -->
 <div class="modal-bg" id="panel-lookup-modal" onclick="if(event.target===this)closePanelLookup()">
@@ -8946,6 +8983,7 @@ async function parsePasteList(){
 
 function renderKPIMetrics(){
   soLoad(); finJobsLoad();
+  const goals=loadKPIGoals();
   const now=new Date();
   const fourWk=new Date(now-28*864e5);
   const recent=SO_LOG.filter(r=>r.date&&new Date(r.date+'T12:00')>=fourWk);
@@ -8955,14 +8993,23 @@ function renderKPIMetrics(){
   const thisMonthJobs=FIN_JOBS.filter(r=>r.month===thisMonth);
   const completedThisMonth=thisMonthJobs.filter(r=>r.status==='completed').length;
   const scheduledThisMonth=thisMonthJobs.length;
+  // Annual revenue progress from payment schedule
+  const thisYear=now.getFullYear()+'';
+  const annualEV=FIN_JOBS.filter(r=>r.month&&r.month.startsWith(thisYear)).reduce((s,r)=>s+(r.contractValue||0),0);
+  const annualTarget=goals.annualRevenue||0;
+  const annualPct=annualTarget>0?Math.min(100,Math.round(annualEV/annualTarget*100)):null;
   const m=gel('kpi-metrics');
   if(!m)return;
-  m.innerHTML=[
-    {l:'Installs / week (4 wk avg)',v:perWeek,sub:'Target: 5+',c:parseFloat(perWeek)>=5?'#059669':parseFloat(perWeek)>=3?'#d97706':'#dc2626'},
+  const cards=[
+    {l:'Installs / week (4 wk avg)',v:perWeek,sub:'Target: '+goals.weeklyInstalls+'+',c:parseFloat(perWeek)>=goals.weeklyInstalls?'#059669':parseFloat(perWeek)>=(goals.weeklyInstalls*0.6)?'#d97706':'#dc2626'},
     {l:'Total signed off',v:SO_LOG.length,sub:'All time',c:'#1e40af'},
-    {l:'Overrun rate',v:overrunRate+'%',sub:'Target: <20%',c:overrunRate<=20?'#059669':overrunRate<=40?'#d97706':'#dc2626'},
+    {l:'Overrun rate',v:overrunRate+'%',sub:'Target: <'+goals.overrunPct+'%',c:overrunRate<=goals.overrunPct?'#059669':overrunRate<=(goals.overrunPct*2)?'#d97706':'#dc2626'},
     {l:'This month',v:completedThisMonth+'/'+scheduledThisMonth,sub:'Completed / scheduled',c:completedThisMonth>=scheduledThisMonth?'#059669':'#d97706'},
-  ].map(k=>`<div style="background:var(--card);border:1.5px solid var(--bdr);border-radius:12px;padding:14px 16px">
+  ];
+  if(annualTarget>0){
+    cards.push({l:'Annual revenue target',v:'£'+(annualEV>=1e6?(annualEV/1e6).toFixed(2)+'m':(annualEV/1e3).toFixed(0)+'k'),sub:(annualPct+'% of £'+(annualTarget>=1e6?(annualTarget/1e6).toFixed(1)+'m':(annualTarget/1e3).toFixed(0)+'k')+' target'),c:annualPct>=80?'#059669':annualPct>=50?'#d97706':'#dc2626'});
+  }
+  m.innerHTML=cards.map(k=>`<div style="background:var(--card);border:1.5px solid var(--bdr);border-radius:12px;padding:14px 16px">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:4px">${k.l}</div>
     <div style="font-size:26px;font-weight:700;color:${k.c};font-family:var(--mo);line-height:1.1">${k.v}</div>
     <div style="font-size:11px;color:var(--ink3);margin-top:3px">${k.sub}</div>
@@ -9016,6 +9063,37 @@ function deleteTarget(idx){
   saveTargets(sorted);
   renderTargetHistory();
   renderKPIChart();
+}
+
+// ── KPI Goals ──
+const KPI_GOALS_KEY = 'gguk_kpi_goals';
+function loadKPIGoals(){
+  try{ return JSON.parse(localStorage.getItem(KPI_GOALS_KEY)||'null')||{weeklyInstalls:5,overrunPct:20,annualRevenue:0,weeklyKwp:20,weeklyKwh:50}; }catch(e){ return {weeklyInstalls:5,overrunPct:20,annualRevenue:0,weeklyKwp:20,weeklyKwh:50}; }
+}
+function saveKPIGoals(){
+  const g={
+    weeklyInstalls: parseFloat(document.getElementById('goal-weekly-installs').value)||5,
+    overrunPct: parseFloat(document.getElementById('goal-overrun-pct').value)||20,
+    annualRevenue: parseFloat(document.getElementById('goal-annual-revenue').value)||0,
+    weeklyKwp: parseFloat(document.getElementById('goal-weekly-kwp').value)||20,
+    weeklyKwh: parseFloat(document.getElementById('goal-weekly-kwh').value)||50,
+  };
+  try{ localStorage.setItem(KPI_GOALS_KEY, JSON.stringify(g)); }catch(e){}
+  closeKPIGoals();
+  renderKPIMetrics();
+  renderKPIChart();
+}
+function openKPIGoals(){
+  const g=loadKPIGoals();
+  document.getElementById('goal-weekly-installs').value=g.weeklyInstalls;
+  document.getElementById('goal-overrun-pct').value=g.overrunPct;
+  document.getElementById('goal-annual-revenue').value=g.annualRevenue||'';
+  document.getElementById('goal-weekly-kwp').value=g.weeklyKwp;
+  document.getElementById('goal-weekly-kwh').value=g.weeklyKwh;
+  const m=document.getElementById('kpi-goals-modal'); if(m) m.style.display='flex';
+}
+function closeKPIGoals(){
+  const m=document.getElementById('kpi-goals-modal'); if(m) m.style.display='none';
 }
 
 // ── KPI drag-target chart system ──
