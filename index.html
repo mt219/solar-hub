@@ -1784,6 +1784,7 @@ const BLANK = () => ({
 let J = BLANK();
 let JOBS = [];
 let MCfg = {key:'', boardId:''};
+let PL_EDIT_REF = null;
 let MJobs = [];
 
 // String plan
@@ -9518,7 +9519,6 @@ function estimateEquipmentCost(job, costTable){
   return Math.round(cost);
 }
 
-let PL_EDIT_REF = null;
 function openPLEditor(ref){
   const job=JOBS.find(j=>j.ref===ref); if(!job)return;
   const costs=loadPLJobCosts();
