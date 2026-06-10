@@ -318,6 +318,9 @@ select.ei{cursor:pointer}
         <span class="nav-dot" style="background:#d97706"></span> Scaffold quotes
         <span class="nav-badge badge" id="nb-costs" style="background:#fef3c7;color:#92400e;display:none">0</span>
       </div>
+      <div class="nav-item" data-sec="jobcosting" onclick="goSection('jobcosting')">
+        <span class="nav-dot" style="background:#16a34a"></span> <strong>Job costing &amp; P&amp;L</strong>
+      </div>
     </div>
 
     <div class="nav-group">
@@ -1166,6 +1169,95 @@ select.ei{cursor:pointer}
         </div>
         <div id="saved-list-archive-inner" class="saved-jobs-list"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ JOB COSTING & P&L ═══ -->
+<div class="section" id="s-jobcosting">
+  <div class="page-header">
+    <div class="page-title">Job costing &amp; P&amp;L</div>
+    <div class="page-sub">Upload your price list &amp; Simpro hours reports · costs auto-assign to jobs · per-job profit &amp; loss below</div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px" id="jc-top-grid">
+    <!-- PRICE LIST -->
+    <div class="card" style="margin:0">
+      <div class="card-head">
+        <div class="ch-icon" style="background:#dcfce7">💷</div>
+        <div><div class="ch-title">Price list</div><div class="ch-sub">CSV or Excel · item, unit, cost · date-versioned</div></div>
+      </div>
+      <div class="card-body">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <input type="file" id="jc-pl-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="jcUploadPriceList(this)">
+          <button class="btn btn-green btn-sm" onclick="gel('jc-pl-file').click()">⬆ Upload price list</button>
+          <label style="font-size:11px;color:var(--ink3)">Effective from
+            <input class="inp" type="date" id="jc-pl-date" style="font-size:11px;padding:5px 8px;width:auto;margin-left:4px">
+          </label>
+        </div>
+        <div id="jc-pl-status" style="font-size:12px;color:var(--ink3)"></div>
+        <div id="jc-pl-preview" style="max-height:220px;overflow:auto;margin-top:8px"></div>
+      </div>
+    </div>
+
+    <!-- TIMESHEETS -->
+    <div class="card" style="margin:0">
+      <div class="card-head">
+        <div class="ch-icon" style="background:#e0f2fe">⏱</div>
+        <div><div class="ch-title">Labour hours (Simpro report)</div><div class="ch-sub">Upload weekly hours export · auto-matched to jobs by ref / name / postcode</div></div>
+      </div>
+      <div class="card-body">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <input type="file" id="jc-ts-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="jcUploadTimesheet(this)">
+          <button class="btn btn-green btn-sm" onclick="gel('jc-ts-file').click()">⬆ Upload hours report</button>
+          <button class="btn btn-ghost btn-xs" onclick="if(confirm('Clear ALL uploaded timesheet rows?')){JC.timesheet=[];jcSave();jcRender();}">Clear all</button>
+        </div>
+        <div id="jc-ts-status" style="font-size:12px;color:var(--ink3)"></div>
+        <div id="jc-ts-unmatched" style="margin-top:8px"></div>
+        <div style="border-top:1.5px solid var(--bdr);margin-top:12px;padding-top:10px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:8px">Labour rates (£/hr cost)</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <label style="font-size:11px;color:var(--ink3)">Electrician <input class="inp" type="number" id="jc-rate-elec" style="width:80px;font-size:12px;padding:5px 8px" oninput="JC.rates.elec=parseFloat(this.value)||0;jcSave();jcRenderPL()"></label>
+            <label style="font-size:11px;color:var(--ink3)">Roofer <input class="inp" type="number" id="jc-rate-roof" style="width:80px;font-size:12px;padding:5px 8px" oninput="JC.rates.roof=parseFloat(this.value)||0;jcSave();jcRenderPL()"></label>
+            <label style="font-size:11px;color:var(--ink3)">Apprentice <input class="inp" type="number" id="jc-rate-app" style="width:80px;font-size:12px;padding:5px 8px" oninput="JC.rates.app=parseFloat(this.value)||0;jcSave();jcRenderPL()"></label>
+            <label style="font-size:11px;color:var(--ink3)">Default <input class="inp" type="number" id="jc-rate-def" style="width:80px;font-size:12px;padding:5px 8px" oninput="JC.rates.def=parseFloat(this.value)||0;jcSave();jcRenderPL()"></label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MISC COSTS -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-head">
+      <div class="ch-icon" style="background:#fef3c7">🧾</div>
+      <div><div class="ch-title">Misc costs</div><div class="ch-sub">One-off costs assigned to a job — skip hire, plant, extra materials, parking, anything</div></div>
+    </div>
+    <div class="card-body">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+        <select class="inp" id="jc-misc-job" style="width:auto;font-size:12px;padding:6px 10px"></select>
+        <input class="inp" id="jc-misc-label" placeholder="Description (e.g. Skip hire)" style="width:220px;font-size:12px;padding:6px 10px">
+        <input class="inp" type="number" id="jc-misc-amount" placeholder="£" style="width:100px;font-size:12px;padding:6px 10px">
+        <button class="btn btn-green btn-sm" onclick="jcAddMisc()">+ Add cost</button>
+      </div>
+      <div id="jc-misc-list"></div>
+    </div>
+  </div>
+
+  <!-- P&L TABLE -->
+  <div class="card" style="margin-bottom:0">
+    <div class="card-head">
+      <div class="ch-icon" style="background:#f3e8ff">📊</div>
+      <div><div class="ch-title">Profit &amp; loss — job by job</div><div class="ch-sub">Kit costed from price list · labour from uploaded hours · scaffold from accepted quotes · click a row for full breakdown</div></div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-ghost btn-xs" onclick="jcExportCSV()">⬇ Export CSV</button>
+        <button class="btn btn-ghost btn-xs" onclick="jcRender()">&#8635; Refresh</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div id="jc-pl-summary" style="display:flex;gap:0;border:1.5px solid var(--bdr);border-radius:10px;overflow:hidden;margin-bottom:12px;background:var(--bg2)"></div>
+      <div style="overflow:auto"><div id="jc-pl-table"></div></div>
+      <div id="jc-detail" style="margin-top:12px"></div>
     </div>
   </div>
 </div>
@@ -2306,6 +2398,7 @@ function goSection(id) {
   }
   if(id==='saved') { renderSaved(); }
   if(id==='costs') { ctLoad(); ctPopulateQuarterSelect(); renderCostTracker(); }
+  if(id==='jobcosting') { jcInit(); }
   window.scrollTo(0,0);
 }
 
@@ -3950,10 +4043,15 @@ async function generatePack(type) {
       (dsItems.length?' · '+dsItems.length+' datasheet'+(dsItems.length!==1?'s':'')+' for uploaded or linked':'')+
       (wItems.length?' · '+wItems.length+' product warrant'+(wItems.length!==1?'ies':'y'):'')+
       '</div></div>'+
+      '<button class="file-dl" id="pack-dl-all" style="margin-left:auto;background:'+col+';color:#fff;font-weight:700;padding:8px 14px;flex-shrink:0">⬇ Download all as PDF</button>'+
       '</div>'+
       '<div style="padding:14px 18px" id="gen-file-list"></div></div>';
 
     const list=gel('gen-file-list');
+    // Stash docs for "Download all as PDF"
+    window.__packDocs = docs.map(function(d){ return {html:d.html, fn:ref+'_'+d.fn}; });
+    const dlAllBtn=gel('pack-dl-all');
+    if(dlAllBtn) dlAllBtn.onclick=function(){ downloadAllPdfs(dlAllBtn); };
 
     function secHdr(label,icon){
       const d=document.createElement('div');
@@ -3968,6 +4066,16 @@ async function generatePack(type) {
       const b=document.createElement('button'); b.className='file-dl'; b.innerHTML='🖨 Open &amp; print';
       b.onclick=(function(h,n){return function(){openDoc(h,n);};})(htmlContent,filename);
       btnWrap.appendChild(b);
+      // Download as true PDF (no print dialog)
+      const pb=document.createElement('button');
+      pb.className='file-dl'; pb.innerHTML='⬇ PDF';
+      pb.style.cssText='background:'+col+';color:#fff;font-size:11px;padding:6px 10px';
+      pb.title='Download as PDF file';
+      pb.onclick=(function(h,n){return function(){
+        pb.innerHTML='⏳'; pb.disabled=true;
+        downloadDocPdf(h,n,function(ok){ pb.innerHTML=ok?'✅':'⬇ PDF'; pb.disabled=false; if(ok)setTimeout(function(){pb.innerHTML='⬇ PDF';},3000); });
+      };})(htmlContent,filename);
+      btnWrap.appendChild(pb);
       // Edit as Word button
       const wb=document.createElement('button');
       wb.className='file-dl'; wb.innerHTML='✏️ Edit (.docx)';
@@ -6202,6 +6310,75 @@ function ggukHeader(title) {
 }
 
 // ── Open document in new print window ─────────────────────
+// ── True PDF download (html2pdf in hidden iframe — no print dialog) ──
+function docPdfHead(){
+  return `<meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+      body{font-family:Arial,sans-serif;font-size:9pt;color:#111;padding:2mm;background:#fff}
+      table{width:100%;border-collapse:collapse;margin-bottom:4mm}
+      td,th{padding:4pt 6pt;border:1px solid #ccc;vertical-align:top;font-size:8.5pt}
+      .hdr{background:#f0f0f0;font-weight:bold}
+      .page-break{page-break-after:always;height:0;display:block}
+      .footer{font-size:7.5pt;color:#666;border-top:1px solid #ddd;margin-top:6mm;padding-top:3mm;text-align:center}
+      h2{font-size:12pt;margin-bottom:4mm}
+      ul{margin:0 0 4mm 8mm}
+      li{line-height:1.9;font-size:9pt}
+      p{margin-bottom:3mm;line-height:1.6;font-size:9pt}
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>`;
+}
+function downloadDocPdf(html, filename, done){
+  const fname=(filename||'document').replace(/\.pdf$/i,'')+'.pdf';
+  const f=document.createElement('iframe');
+  f.style.cssText='position:fixed;left:-12000px;top:0;width:794px;height:1123px;border:0';
+  document.body.appendChild(f);
+  const doc=f.contentDocument||f.contentWindow.document;
+  doc.open();
+  doc.write('<!DOCTYPE html><html><head>'+docPdfHead()+'</head><body>'+html+'</body></html>');
+  doc.close();
+  let tries=0;
+  const cleanup=function(ok){ try{document.body.removeChild(f);}catch(e){} if(done) done(ok); };
+  const run=function(){
+    const w=f.contentWindow;
+    if(!w || !w.html2pdf){
+      if(++tries>50){ cleanup(false); alert('PDF library failed to load — check your connection and try again.'); return; }
+      setTimeout(run,200); return;
+    }
+    try{
+      w.html2pdf().set({
+        margin:[10,10,12,10],
+        filename:fname,
+        image:{type:'jpeg',quality:0.96},
+        html2canvas:{scale:2,useCORS:true,logging:false},
+        jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+        pagebreak:{mode:['css','legacy'],after:'.page-break'}
+      }).from(w.document.body).save()
+        .then(function(){cleanup(true);})
+        .catch(function(){cleanup(false);});
+    }catch(e){ cleanup(false); }
+  };
+  setTimeout(run,250);
+}
+function downloadAllPdfs(btn){
+  const docs=window.__packDocs||[];
+  if(!docs.length){ alert('Generate the pack first.'); return; }
+  let i=0;
+  const orig=btn?btn.innerHTML:'';
+  if(btn) btn.disabled=true;
+  const next=function(){
+    if(i>=docs.length){
+      if(btn){ btn.innerHTML='✅ All downloaded'; btn.disabled=false; setTimeout(function(){btn.innerHTML=orig;},4000); }
+      return;
+    }
+    const d=docs[i++];
+    if(btn) btn.innerHTML='⏳ '+i+'/'+docs.length;
+    downloadDocPdf(d.html, d.fn, function(){ setTimeout(next,400); });
+  };
+  next();
+}
+
 function openDoc(html, filename) {
   const w = window.open('','_blank','width=850,height=1100');
   if(!w){ alert('Please allow pop-ups for this page to open documents.'); return; }
@@ -9719,6 +9896,329 @@ finJobsLoad();finLoad();soLoad();subLoad();
 // Standalone mode - no Supabase
 sbStatus('🟢 live', true);
 finJobsLoadLocal(); finLoadLocal(); soLoadLocal();
+
+// ════════════════════════════════════════════════════════════
+// JOB COSTING & P&L MODULE
+// ════════════════════════════════════════════════════════════
+var JC = { priceLists:[], timesheet:[], rates:{elec:0,roof:0,app:0,def:0}, jobs:{} };
+// JC.jobs[ref] = { sale:0, scaffOverride:null, misc:[{label,amount,date}], kitOverride:null }
+
+function jcLoad(){ try{ const d=JSON.parse(localStorage.getItem('gguk_jobcosting')||'null'); if(d) JC=Object.assign(JC,d); }catch(e){} }
+function jcSave(){ try{ localStorage.setItem('gguk_jobcosting', JSON.stringify(JC)); }catch(e){} }
+function jcJob(ref){ if(!JC.jobs[ref]) JC.jobs[ref]={sale:0,scaffOverride:null,misc:[],kitOverride:null}; return JC.jobs[ref]; }
+function jcFmt(n){ return '£'+(Math.round((n||0)*100)/100).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function jcInit(){
+  jcLoad();
+  gel('jc-rate-elec').value=JC.rates.elec||'';
+  gel('jc-rate-roof').value=JC.rates.roof||'';
+  gel('jc-rate-app').value=JC.rates.app||'';
+  gel('jc-rate-def').value=JC.rates.def||'';
+  const dt=gel('jc-pl-date'); if(dt && !dt.value) dt.value=new Date().toISOString().slice(0,10);
+  jcRender();
+}
+
+// ── File parsing (CSV native, XLSX via SheetJS lazy-load) ──
+function jcLoadXlsxLib(cb){
+  if(window.XLSX){ cb(); return; }
+  const s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  s.onload=cb; s.onerror=function(){ alert('Could not load the Excel reader — check connection, or upload as CSV instead.'); };
+  document.head.appendChild(s);
+}
+function jcParseCSV(text){
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else if(c==='"') q=true;
+    else if(c===',') { row.push(cur); cur=''; }
+    else if(c==='\n'||c==='\r'){ if(cur!==''||row.length){ row.push(cur); rows.push(row); row=[]; cur=''; } if(c==='\r'&&text[i+1]==='\n') i++; }
+    else cur+=c;
+  }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r=>r.some(c=>String(c).trim()!==''));
+}
+function jcReadFile(input, cb){
+  const f=input.files && input.files[0]; if(!f) return;
+  const name=f.name.toLowerCase();
+  if(name.endsWith('.csv')){
+    const r=new FileReader();
+    r.onload=function(){ cb(jcParseCSV(String(r.result)), f.name); input.value=''; };
+    r.readAsText(f);
+  } else {
+    jcLoadXlsxLib(function(){
+      const r=new FileReader();
+      r.onload=function(){
+        try{
+          const wb=XLSX.read(r.result,{type:'array'});
+          const ws=wb.Sheets[wb.SheetNames[0]];
+          const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
+          cb(rows.filter(r2=>r2.some(c=>String(c).trim()!=='')), f.name);
+        }catch(e){ alert('Could not read that file: '+e.message); }
+        input.value='';
+      };
+      r.readAsArrayBuffer(f);
+    });
+  }
+}
+function jcFindCol(headers, keys){
+  for(let i=0;i<headers.length;i++){
+    const h=String(headers[i]||'').toLowerCase();
+    for(const k of keys) if(h.indexOf(k)>-1) return i;
+  }
+  return -1;
+}
+
+// ── Price list upload ──
+function jcUploadPriceList(input){
+  jcReadFile(input, function(rows, fname){
+    if(rows.length<2){ alert('No data rows found in '+fname); return; }
+    const hdr=rows[0];
+    const ci={ name:jcFindCol(hdr,['item','product','description','name','material']),
+               unit:jcFindCol(hdr,['unit','uom','per']),
+               cost:jcFindCol(hdr,['cost','price','rate','£','gbp']) };
+    if(ci.name<0||ci.cost<0){ alert('Could not find item-name and cost columns. Headers found: '+hdr.join(', ')+'. Make sure there is a column containing "item/product/description" and one containing "cost/price".'); return; }
+    const items=[];
+    for(let i=1;i<rows.length;i++){
+      const nm=String(rows[i][ci.name]||'').trim();
+      const cost=parseFloat(String(rows[i][ci.cost]||'').replace(/[£,\s]/g,''));
+      if(!nm||isNaN(cost)) continue;
+      items.push({name:nm, unit:ci.unit>-1?String(rows[i][ci.unit]||'').trim():'', cost:cost});
+    }
+    if(!items.length){ alert('No valid priced items found in '+fname); return; }
+    const eff=(gel('jc-pl-date')&&gel('jc-pl-date').value)||new Date().toISOString().slice(0,10);
+    JC.priceLists.push({date:eff, file:fname, uploaded:new Date().toISOString(), items:items});
+    JC.priceLists.sort((a,b)=>a.date<b.date?-1:1);
+    jcSave(); jcRender();
+  });
+}
+function jcActivePriceList(jobDate){
+  if(!JC.priceLists.length) return null;
+  let best=null;
+  for(const pl of JC.priceLists){ if(!jobDate || pl.date<=jobDate) best=pl; }
+  return best||JC.priceLists[0];
+}
+function jcDeletePriceList(i){ if(!confirm('Delete this price list version?'))return; JC.priceLists.splice(i,1); jcSave(); jcRender(); }
+
+// ── Price matching (token overlap between equipment and price list item names) ──
+function jcTok(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9. ]/g,' ').split(/\s+/).filter(t=>t.length>1); }
+function jcMatchPrice(pl, brand, model){
+  if(!pl) return null;
+  const want=jcTok(brand+' '+model);
+  if(!want.length) return null;
+  let best=null, bestScore=0;
+  for(const it of pl.items){
+    const have=jcTok(it.name);
+    let score=0;
+    for(const w of want) if(have.indexOf(w)>-1) score++;
+    if(have.indexOf(jcTok(brand)[0])<0) continue; // brand must match
+    if(score>bestScore){ bestScore=score; best=it; }
+  }
+  return bestScore>0?best:null;
+}
+
+// ── Kit cost per job ──
+function jcKitCost(job){
+  const jc=jcJob(job.ref);
+  if(jc.kitOverride!=null && jc.kitOverride!=='') return {total:parseFloat(jc.kitOverride)||0, lines:[{label:'Manual override',amount:parseFloat(jc.kitOverride)||0}], overridden:true};
+  const pl=jcActivePriceList(job.start||null);
+  const lines=[]; let total=0;
+  const groups=[['panels','qty'],['inverters','qty'],['batteries','qty'],['evChargers','qty']];
+  for(const [key] of groups){
+    for(const it of (job[key]||[])){
+      if(!it.brand) continue;
+      const qty=parseInt(it.qty)||1;
+      const m=jcMatchPrice(pl, it.brand, it.model);
+      if(m){ const amt=m.cost*qty; total+=amt; lines.push({label:qty+'× '+it.brand+' '+(it.model||'')+' → '+m.name+' @ '+jcFmt(m.cost), amount:amt}); }
+      else lines.push({label:qty+'× '+it.brand+' '+(it.model||'')+' — no price found', amount:0, missing:true});
+    }
+  }
+  // Mounting kit: match "<rooftype> mounting" style items, priced per panel
+  const tp=(job.panels||[]).reduce((a,p)=>a+(parseInt(p.qty)||0),0);
+  if(tp>0 && pl){
+    const roof=String(job.roof||'').toLowerCase();
+    let mk=null;
+    for(const it of pl.items){
+      const n=it.name.toLowerCase();
+      if((n.indexOf('mount')>-1||n.indexOf('rail')>-1||n.indexOf('fixing kit')>-1) && (roof && n.indexOf(roof.split(' ')[0])>-1)){ mk=it; break; }
+    }
+    if(!mk) for(const it of pl.items){ const n=it.name.toLowerCase(); if(n.indexOf('mounting kit')>-1){ mk=it; break; } }
+    if(mk){ const amt=mk.cost*tp; total+=amt; lines.push({label:tp+'× '+mk.name+' @ '+jcFmt(mk.cost)+' (per panel)', amount:amt}); }
+    else lines.push({label:'Mounting kit — no matching price list item ("mounting"/"rail")', amount:0, missing:true});
+  }
+  return {total:total, lines:lines, overridden:false};
+}
+
+// ── Timesheet upload ──
+function jcUploadTimesheet(input){
+  jcReadFile(input, function(rows, fname){
+    if(rows.length<2){ alert('No data rows found in '+fname); return; }
+    const hdr=rows[0];
+    const hi=jcFindCol(hdr,['hour','hrs','time','duration']);
+    if(hi<0){ alert('Could not find an hours column. Headers found: '+hdr.join(', ')); return; }
+    const di=jcFindCol(hdr,['date']);
+    const pi=jcFindCol(hdr,['employee','staff','engineer','technician','resource','person']);
+    let added=0, unmatched=0;
+    for(let i=1;i<rows.length;i++){
+      const hours=parseFloat(String(rows[i][hi]||'').replace(/[^\d.]/g,''));
+      if(isNaN(hours)||hours<=0) continue;
+      const rowText=rows[i].map(c=>String(c||'')).join(' ').toLowerCase();
+      let ref=null;
+      for(const j of (JOBS||[])){
+        const cands=[j.ref, j.name, j.pc].filter(Boolean).map(s=>String(s).toLowerCase());
+        if(cands.some(c=>c.length>2 && rowText.indexOf(c)>-1)){ ref=j.ref; break; }
+      }
+      const person=pi>-1?String(rows[i][pi]||'').trim():'';
+      JC.timesheet.push({ref:ref, hours:hours, date:di>-1?String(rows[i][di]||''):'', person:person, role:jcGuessRole(person), src:fname, raw:rowText.slice(0,140)});
+      if(ref) added++; else unmatched++;
+    }
+    jcSave(); jcRender();
+    gel('jc-ts-status').innerHTML='✅ '+fname+': <b>'+added+'</b> rows matched to jobs'+(unmatched?', <b style="color:#b45309">'+unmatched+' unmatched</b> (shown below — assign manually)':'');
+  });
+}
+var JC_ELECS=['adam oliver','cameron brown','jake pearce','max edwards','treeve treloar','zakk stidwell'];
+var JC_APPS=['ben medlin','dan rogers','john dunn','orley stidwell'];
+var JC_ROOFERS=['jack edwards','simon','ian','liam','lewis'];
+function jcGuessRole(person){
+  const p=String(person||'').toLowerCase();
+  if(JC_ELECS.some(n=>p.indexOf(n.split(' ')[0])>-1&&p.indexOf(n.split(' ')[1]||'')>-1)||JC_ELECS.indexOf(p)>-1) return 'elec';
+  if(JC_APPS.some(n=>p===n||p.indexOf(n)>-1)) return 'app';
+  if(JC_ROOFERS.some(n=>p===n||p.indexOf(n)>-1)) return 'roof';
+  return 'def';
+}
+function jcRate(role){ return JC.rates[role]||JC.rates.def||0; }
+function jcLabourCost(ref){
+  let total=0, hrs=0; const byPerson={};
+  for(const t of JC.timesheet){
+    if(t.ref!==ref) continue;
+    const r=jcRate(t.role||'def');
+    total+=t.hours*r; hrs+=t.hours;
+    byPerson[t.person||'?']=(byPerson[t.person||'?']||0)+t.hours;
+  }
+  return {total:total, hours:hrs, byPerson:byPerson};
+}
+function jcAssignRow(i, ref){ JC.timesheet[i].ref=ref||null; jcSave(); jcRender(); }
+
+// ── Scaffold cost (accepted/lowest quote, or override) ──
+function jcScaffCost(job){
+  const jc=jcJob(job.ref);
+  if(jc.scaffOverride!=null && jc.scaffOverride!=='') return {total:parseFloat(jc.scaffOverride)||0, src:'manual'};
+  try{
+    const q=JSON.parse(localStorage.getItem('gguk_scaff_quotes_'+job.ref)||'[]');
+    if(Array.isArray(q)&&q.length){
+      const acc=q.find(x=>x&&(x.accepted||x.status==='accepted'));
+      const pick=acc||q.reduce((a,b)=>{const av=parseFloat(a&&a.amount)||Infinity,bv=parseFloat(b&&b.amount)||Infinity;return bv<av?b:a;},null);
+      const amt=pick?parseFloat(pick.amount):NaN;
+      if(!isNaN(amt)) return {total:amt, src:acc?'accepted quote':'lowest quote'};
+    }
+  }catch(e){}
+  return {total:0, src:'none'};
+}
+
+// ── Misc costs ──
+function jcAddMisc(){
+  const ref=gel('jc-misc-job').value, label=gel('jc-misc-label').value.trim(), amt=parseFloat(gel('jc-misc-amount').value);
+  if(!ref){ alert('Pick a job.'); return; }
+  if(!label||isNaN(amt)){ alert('Enter a description and amount.'); return; }
+  jcJob(ref).misc.push({label:label, amount:amt, date:new Date().toISOString().slice(0,10)});
+  gel('jc-misc-label').value=''; gel('jc-misc-amount').value='';
+  jcSave(); jcRender();
+}
+function jcDelMisc(ref,i){ jcJob(ref).misc.splice(i,1); jcSave(); jcRender(); }
+function jcMiscTotal(ref){ return jcJob(ref).misc.reduce((a,m)=>a+(parseFloat(m.amount)||0),0); }
+
+// ── Render ──
+function jcRender(){ jcRenderPriceList(); jcRenderTS(); jcRenderMisc(); jcRenderPL(); }
+function jcRenderPriceList(){
+  const st=gel('jc-pl-status'), pv=gel('jc-pl-preview');
+  if(!st) return;
+  if(!JC.priceLists.length){ st.innerHTML='No price list uploaded yet. Expected columns: item/description, unit (optional), cost/price.'; pv.innerHTML=''; return; }
+  st.innerHTML=JC.priceLists.map((pl,i)=>'<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span>📄 <b>'+pl.file+'</b> — '+pl.items.length+' items, effective '+pl.date+'</span><button class="file-dl" style="background:#fee2e2;color:#b91c1c;padding:3px 8px;font-size:10px" onclick="jcDeletePriceList('+i+')">✕</button></div>').join('');
+  const latest=JC.priceLists[JC.priceLists.length-1];
+  pv.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+    '<tr><th style="text-align:left;padding:4px;border-bottom:1px solid var(--bdr)">Item (latest list)</th><th style="text-align:left;padding:4px;border-bottom:1px solid var(--bdr)">Unit</th><th style="text-align:right;padding:4px;border-bottom:1px solid var(--bdr)">Cost</th></tr>'+
+    latest.items.slice(0,100).map(it=>'<tr><td style="padding:3px 4px">'+it.name+'</td><td style="padding:3px 4px;color:var(--ink3)">'+(it.unit||'')+'</td><td style="padding:3px 4px;text-align:right">'+jcFmt(it.cost)+'</td></tr>').join('')+'</table>'+
+    (latest.items.length>100?'<div style="font-size:10px;color:var(--ink3);padding:4px">…and '+(latest.items.length-100)+' more</div>':'');
+}
+function jcRenderTS(){
+  const un=gel('jc-ts-unmatched'); if(!un) return;
+  const u=JC.timesheet.map((t,i)=>({t:t,i:i})).filter(x=>!x.t.ref);
+  const matched=JC.timesheet.filter(t=>t.ref).length;
+  const st=gel('jc-ts-status');
+  if(st && !st.innerHTML) st.innerHTML=JC.timesheet.length?('<b>'+matched+'</b> hour rows matched to jobs'+(u.length?', <b style="color:#b45309">'+u.length+' unmatched</b>':'')):'No hours uploaded yet.';
+  const opts='<option value="">— assign job —</option>'+(JOBS||[]).map(j=>'<option value="'+j.ref+'">'+j.ref+' '+(j.name||'')+'</option>').join('');
+  un.innerHTML=u.length?('<div style="font-size:11px;font-weight:700;color:#b45309;margin-bottom:6px">Unmatched rows</div>'+u.slice(0,30).map(x=>'<div style="display:flex;gap:6px;align-items:center;font-size:11px;padding:3px 0"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+x.t.raw+'">'+(x.t.person||'?')+' · '+x.t.hours+'h · '+x.t.raw.slice(0,60)+'</span><select class="inp" style="width:180px;font-size:11px;padding:3px 6px" onchange="jcAssignRow('+x.i+',this.value)">'+opts+'</select><button class="file-dl" style="background:#fee2e2;color:#b91c1c;padding:3px 7px;font-size:10px" onclick="JC.timesheet.splice('+x.i+',1);jcSave();jcRender()">✕</button></div>').join('')):'';
+}
+function jcRenderMisc(){
+  const sel=gel('jc-misc-job'); if(!sel) return;
+  sel.innerHTML='<option value="">— pick job —</option>'+(JOBS||[]).map(j=>'<option value="'+j.ref+'">'+j.ref+' '+(j.name||'')+'</option>').join('');
+  const list=gel('jc-misc-list');
+  let html='';
+  for(const j of (JOBS||[])){
+    const m=JC.jobs[j.ref]&&JC.jobs[j.ref].misc||[];
+    m.forEach((c,i)=>{ html+='<div style="display:flex;gap:8px;align-items:center;font-size:12px;padding:4px 0;border-bottom:1px solid var(--bdr)"><b style="min-width:90px;font-family:var(--mo);font-size:11px;color:var(--blue)">'+j.ref+'</b><span style="flex:1">'+c.label+'</span><span style="color:var(--ink3);font-size:10px">'+(c.date||'')+'</span><b>'+jcFmt(c.amount)+'</b><button class="file-dl" style="background:#fee2e2;color:#b91c1c;padding:3px 7px;font-size:10px" onclick="jcDelMisc(\''+j.ref+'\','+i+')">✕</button></div>'; });
+  }
+  list.innerHTML=html||'<div style="font-size:12px;color:var(--ink3)">No misc costs yet.</div>';
+}
+function jcSetField(ref, field, val){ jcJob(ref)[field]=val; jcSave(); jcRenderPL(); }
+function jcRenderPL(){
+  const tb=gel('jc-pl-table'); if(!tb) return;
+  let totSale=0, totCost=0, rows='';
+  for(const j of (JOBS||[])){
+    const jc=jcJob(j.ref);
+    const kit=jcKitCost(j), lab=jcLabourCost(j.ref), scf=jcScaffCost(j), misc=jcMiscTotal(j.ref);
+    const cost=kit.total+lab.total+scf.total+misc;
+    const sale=parseFloat(jc.sale)||0;
+    const profit=sale-cost, margin=sale>0?(profit/sale*100):0;
+    totSale+=sale; totCost+=cost;
+    rows+='<tr style="border-bottom:1px solid var(--bdr);cursor:pointer" onclick="if(event.target.tagName!==\'INPUT\')jcShowDetail(\''+j.ref+'\')">'+
+      '<td style="padding:6px;font-family:var(--mo);font-size:11px;color:var(--blue)">'+j.ref+'</td>'+
+      '<td style="padding:6px;font-size:12px">'+(j.name||'')+'</td>'+
+      '<td style="padding:6px"><input class="inp" type="number" value="'+(jc.sale||'')+'" placeholder="£ sale" style="width:95px;font-size:11px;padding:4px 6px" onchange="jcSetField(\''+j.ref+'\',\'sale\',this.value)"></td>'+
+      '<td style="padding:6px;text-align:right;font-size:12px'+(kit.lines.some(l=>l.missing)?';color:#b45309':'')+'">'+jcFmt(kit.total)+'</td>'+
+      '<td style="padding:6px;text-align:right;font-size:12px">'+jcFmt(lab.total)+'<div style="font-size:9px;color:var(--ink3)">'+(Math.round(lab.hours*10)/10)+'h</div></td>'+
+      '<td style="padding:6px;text-align:right;font-size:12px">'+jcFmt(scf.total)+'<div style="font-size:9px;color:var(--ink3)">'+scf.src+'</div></td>'+
+      '<td style="padding:6px;text-align:right;font-size:12px">'+jcFmt(misc)+'</td>'+
+      '<td style="padding:6px;text-align:right;font-weight:700;font-size:12px">'+jcFmt(cost)+'</td>'+
+      '<td style="padding:6px;text-align:right;font-weight:700;font-size:12px;color:'+(profit>=0?'var(--grn)':'#dc2626')+'">'+(sale?jcFmt(profit):'—')+'</td>'+
+      '<td style="padding:6px;text-align:right;font-size:11px;color:'+(profit>=0?'var(--grn)':'#dc2626')+'">'+(sale?(Math.round(margin*10)/10+'%'):'—')+'</td></tr>';
+  }
+  tb.innerHTML='<table style="width:100%;border-collapse:collapse;min-width:920px"><tr style="background:var(--bg)">'+
+    ['Ref','Customer','Sale £','Kit','Labour','Scaffold','Misc','Total cost','Profit','Margin'].map((h,i)=>'<th style="padding:6px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);text-align:'+(i<3?'left':'right')+'">'+h+'</th>').join('')+'</tr>'+rows+'</table>';
+  const totProfit=totSale-totCost;
+  const sm=gel('jc-pl-summary');
+  if(sm) sm.innerHTML=[['Total sales',jcFmt(totSale)],['Total costs',jcFmt(totCost)],['Total profit',jcFmt(totProfit)],['Blended margin',(totSale>0?Math.round(totProfit/totSale*1000)/10+'%':'—')]]
+    .map(x=>'<div style="flex:1;padding:10px 14px;border-right:1.5px solid var(--bdr)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3)">'+x[0]+'</div><div style="font-size:16px;font-weight:700;margin-top:2px">'+x[1]+'</div></div>').join('');
+}
+function jcShowDetail(ref){
+  const j=(JOBS||[]).find(x=>x.ref===ref); if(!j) return;
+  const jc=jcJob(ref), kit=jcKitCost(j), lab=jcLabourCost(ref), scf=jcScaffCost(j);
+  const d=gel('jc-detail');
+  d.innerHTML='<div style="background:var(--bg2);border:1.5px solid var(--bdr);border-radius:10px;padding:14px 16px">'+
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><b style="font-size:14px">'+ref+' — '+(j.name||'')+'</b><button class="file-dl" style="margin-left:auto;padding:4px 10px;font-size:11px" onclick="gel(\'jc-detail\').innerHTML=\'\'">✕ Close</button></div>'+
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ink3);margin:8px 0 4px">Kit '+(kit.overridden?'(manual override)':'')+'</div>'+
+    kit.lines.map(l=>'<div style="display:flex;font-size:12px;padding:2px 0'+(l.missing?';color:#b45309':'')+'"><span style="flex:1">'+l.label+'</span><b>'+jcFmt(l.amount)+'</b></div>').join('')+
+    '<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><label style="font-size:11px;color:var(--ink3)">Kit override £ <input class="inp" type="number" value="'+(jc.kitOverride||'')+'" style="width:100px;font-size:11px;padding:4px 6px" onchange="jcSetField(\''+ref+'\',\'kitOverride\',this.value);jcShowDetail(\''+ref+'\')"></label><span style="font-size:10px;color:var(--ink3)">leave blank to use auto-pricing</span></div>'+
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ink3);margin:10px 0 4px">Labour — '+(Math.round(lab.hours*10)/10)+'h total</div>'+
+    Object.keys(lab.byPerson).map(p=>'<div style="display:flex;font-size:12px;padding:2px 0"><span style="flex:1">'+p+'</span><span>'+(Math.round(lab.byPerson[p]*10)/10)+'h</span></div>').join('')+
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ink3);margin:10px 0 4px">Scaffold — '+scf.src+'</div>'+
+    '<div style="display:flex;gap:8px;align-items:center"><b style="font-size:12px">'+jcFmt(scf.total)+'</b><label style="font-size:11px;color:var(--ink3);margin-left:10px">Override £ <input class="inp" type="number" value="'+(jc.scaffOverride||'')+'" style="width:100px;font-size:11px;padding:4px 6px" onchange="jcSetField(\''+ref+'\',\'scaffOverride\',this.value);jcShowDetail(\''+ref+'\')"></label></div>'+
+    '</div>';
+  d.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function jcExportCSV(){
+  let csv='Ref,Customer,Sale,Kit,Labour,LabourHours,Scaffold,Misc,TotalCost,Profit,MarginPct\n';
+  for(const j of (JOBS||[])){
+    const jc=jcJob(j.ref), kit=jcKitCost(j), lab=jcLabourCost(j.ref), scf=jcScaffCost(j), misc=jcMiscTotal(j.ref);
+    const cost=kit.total+lab.total+scf.total+misc, sale=parseFloat(jc.sale)||0;
+    csv+=[j.ref,'"'+String(j.name||'').replace(/"/g,'""')+'"',sale,kit.total.toFixed(2),lab.total.toFixed(2),lab.hours,scf.total.toFixed(2),misc.toFixed(2),cost.toFixed(2),(sale-cost).toFixed(2),(sale>0?((sale-cost)/sale*100).toFixed(1):'')].join(',')+'\n';
+  }
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='GGUK_Job_PL_'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
+}
+jcLoad();
 
 </script>
 </body>
