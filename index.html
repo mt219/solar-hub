@@ -1253,12 +1253,17 @@ select.ei{cursor:pointer}
   <div class="card" style="margin-bottom:14px">
     <div class="card-head">
       <div class="ch-icon" style="background:#fef3c7">🧾</div>
-      <div><div class="ch-title">Misc costs</div><div class="ch-sub">One-off costs assigned to a job — skip hire, plant, extra materials, parking, anything</div></div>
+      <div><div class="ch-title">Misc &amp; subcontractor costs</div><div class="ch-sub">One-off costs assigned to a job — skip hire, plant, parking, extra materials, or a subcontractor team's fixed price (subbie folds into Labour)</div></div>
     </div>
     <div class="card-body">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-        <select class="inp" id="jc-misc-job" style="width:auto;font-size:12px;padding:6px 10px"></select>
-        <input class="inp" id="jc-misc-label" placeholder="Description (e.g. Skip hire)" style="width:220px;font-size:12px;padding:6px 10px">
+        <input class="inp" id="jc-misc-job" list="jc-misc-joblist" placeholder="🔍 Search job — ref, name or postcode…" autocomplete="off" style="width:250px;font-size:12px;padding:6px 10px">
+        <datalist id="jc-misc-joblist"></datalist>
+        <select class="inp" id="jc-misc-type" style="width:auto;font-size:12px;padding:6px 10px">
+          <option value="misc">Misc cost</option>
+          <option value="subbie">Subcontractor labour</option>
+        </select>
+        <input class="inp" id="jc-misc-label" placeholder="Description (e.g. Skip hire / Subbie team)" style="width:220px;font-size:12px;padding:6px 10px">
         <input class="inp" type="number" id="jc-misc-amount" placeholder="£" style="width:100px;font-size:12px;padding:6px 10px">
         <button class="btn btn-green btn-sm" onclick="jcAddMisc()">+ Add cost</button>
       </div>
@@ -9931,7 +9936,7 @@ var JC = { priceLists:[], timesheet:[], rates:{elec:0,roof:0,app:0,def:0}, jobs:
 
 function jcLoad(){ try{ const d=JSON.parse(localStorage.getItem('gguk_jobcosting')||'null'); if(d) JC=Object.assign(JC,d); }catch(e){} }
 function jcSave(){ try{ localStorage.setItem('gguk_jobcosting', JSON.stringify(JC)); }catch(e){} }
-function jcJob(ref){ if(!JC.jobs[ref]) JC.jobs[ref]={sale:0,scaffOverride:null,misc:[],kitOverride:null}; return JC.jobs[ref]; }
+function jcJob(ref){ if(!JC.jobs[ref]) JC.jobs[ref]={sale:0,scaffOverride:null,misc:[],subbie:[],kitOverride:null}; const j=JC.jobs[ref]; if(!Array.isArray(j.misc)) j.misc=[]; if(!Array.isArray(j.subbie)) j.subbie=[]; return j; }
 function jcFmt(n){ return '£'+(Math.round((n||0)*100)/100).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
 function jcInit(){
@@ -9994,6 +9999,30 @@ function jcFindCol(headers, keys){
     for(const k of keys) if(h.indexOf(k)>-1) return i;
   }
   return -1;
+}
+// Simpro/accounting CSVs often have report title / filter / blank rows above the real headers.
+// Scan the first ~20 rows and pick the one that looks most like a header line.
+function jcDetectHeaderRow(rows){
+  const kw=['hour','hrs','time','duration','qty','quantity','worked','billable','actual','minutes','mins',
+            'date','day','employee','staff','engineer','technician','resource','person','worker','user','name',
+            'job','cost center','cost centre','reference','ref','site','customer','description','item','product','cost','price','rate'];
+  let bestI=0, bestScore=-1;
+  const lim=Math.min(rows.length,20);
+  for(let i=0;i<lim;i++){
+    const cells=rows[i].map(c=>String(c||'').toLowerCase());
+    if(cells.filter(c=>c.trim()!=='').length<2) continue;
+    let score=0;
+    for(const c of cells) for(const k of kw) if(c.indexOf(k)>-1){ score++; break; }
+    if(score>bestScore){ bestScore=score; bestI=i; }
+  }
+  return bestI;
+}
+// Hours may be decimal (7.5), "H:MM" (07:30), or contain stray text.
+function jcParseHours(v){
+  const s=String(v||'').trim();
+  if(/^\d{1,3}:\d{2}$/.test(s)){ const p=s.split(':'); return parseInt(p[0],10)+parseInt(p[1],10)/60; }
+  const n=parseFloat(s.replace(/[^\d.]/g,''));
+  return isNaN(n)?NaN:n;
 }
 
 // ── Price list upload ──
@@ -10080,14 +10109,18 @@ function jcKitCost(job){
 function jcUploadTimesheet(input){
   jcReadFile(input, function(rows, fname){
     if(rows.length<2){ alert('No data rows found in '+fname); return; }
-    const hdr=rows[0];
-    const hi=jcFindCol(hdr,['hour','hrs','time','duration']);
-    if(hi<0){ alert('Could not find an hours column. Headers found: '+hdr.join(', ')); return; }
-    const di=jcFindCol(hdr,['date']);
-    const pi=jcFindCol(hdr,['employee','staff','engineer','technician','resource','person']);
+    const hdrIdx=jcDetectHeaderRow(rows);
+    const hdr=rows[hdrIdx];
+    let hi=jcFindCol(hdr,['hours','hrs','duration','time worked','worked','billable hours','actual hours','total time','labour','labor']);
+    if(hi<0) hi=jcFindCol(hdr,['hour','time','qty','quantity','minutes','mins']);
+    if(hi<0){ alert('Could not find an hours column in '+fname+'.\n\nThe row I read as the headers was:\n'+hdr.map(h=>String(h||'').trim()).filter(Boolean).map(h=>'  • '+h).join('\n')+'\n\nIf the hours live under a column not listed there, tell Claude the exact column name and it can map it.'); return; }
+    const isMins=/min/.test(String(hdr[hi]||'').toLowerCase());
+    const di=jcFindCol(hdr,['date','day','week ending','w/e']);
+    const pi=jcFindCol(hdr,['employee','staff','engineer','technician','resource','person','worker','user','name']);
     let added=0, unmatched=0;
-    for(let i=1;i<rows.length;i++){
-      const hours=parseFloat(String(rows[i][hi]||'').replace(/[^\d.]/g,''));
+    for(let i=hdrIdx+1;i<rows.length;i++){
+      let hours=jcParseHours(rows[i][hi]);
+      if(isMins && !isNaN(hours)) hours=hours/60;
       if(isNaN(hours)||hours<=0) continue;
       const rowText=rows[i].map(c=>String(c||'')).join(' ').toLowerCase();
       let ref=null;
@@ -10122,7 +10155,9 @@ function jcLabourCost(ref){
     total+=t.hours*r; hrs+=t.hours;
     byPerson[t.person||'?']=(byPerson[t.person||'?']||0)+t.hours;
   }
-  return {total:total, hours:hrs, byPerson:byPerson};
+  const sub=jcJob(ref).subbie||[];
+  const subTotal=sub.reduce((a,s)=>a+(parseFloat(s.amount)||0),0);
+  return {total:total+subTotal, hours:hrs, byPerson:byPerson, subbie:sub, subTotal:subTotal, payrollTotal:total};
 }
 function jcAssignRow(i, ref){ JC.timesheet[i].ref=ref||null; jcSave(); jcRender(); }
 
@@ -10144,14 +10179,20 @@ function jcScaffCost(job){
 
 // ── Misc costs ──
 function jcAddMisc(){
-  const ref=gel('jc-misc-job').value, label=gel('jc-misc-label').value.trim(), amt=parseFloat(gel('jc-misc-amount').value);
-  if(!ref){ alert('Pick a job.'); return; }
+  const raw=gel('jc-misc-job').value.trim();
+  let ref=JC_MISC_MAP[raw.toLowerCase()];
+  if(!ref){ const lead=(raw.match(/^\s*([A-Za-z0-9\-]+)/)||[])[1]; if(lead && (JOBS||[]).some(j=>String(j.ref)===lead)) ref=lead; }
+  const type=(gel('jc-misc-type')&&gel('jc-misc-type').value)||'misc';
+  const label=gel('jc-misc-label').value.trim(), amt=parseFloat(gel('jc-misc-amount').value);
+  if(!ref){ alert('Pick a job from the list — start typing a ref, name or postcode and choose a match.'); return; }
   if(!label||isNaN(amt)){ alert('Enter a description and amount.'); return; }
-  jcJob(ref).misc.push({label:label, amount:amt, date:new Date().toISOString().slice(0,10)});
-  gel('jc-misc-label').value=''; gel('jc-misc-amount').value='';
+  const j=jcJob(ref);
+  (type==='subbie'?j.subbie:j.misc).push({label:label, amount:amt, date:new Date().toISOString().slice(0,10)});
+  gel('jc-misc-label').value=''; gel('jc-misc-amount').value=''; gel('jc-misc-job').value='';
   jcSave(); jcRender();
 }
-function jcDelMisc(ref,i){ jcJob(ref).misc.splice(i,1); jcSave(); jcRender(); }
+function jcDelCost(ref,type,i){ const arr=(type==='subbie'?jcJob(ref).subbie:jcJob(ref).misc); arr.splice(i,1); jcSave(); jcRender(); }
+function jcDelMisc(ref,i){ jcDelCost(ref,'misc',i); }
 function jcMiscTotal(ref){ return jcJob(ref).misc.reduce((a,m)=>a+(parseFloat(m.amount)||0),0); }
 
 // ── Render ──
@@ -10176,16 +10217,36 @@ function jcRenderTS(){
   const opts='<option value="">— assign job —</option>'+(JOBS||[]).map(j=>'<option value="'+j.ref+'">'+j.ref+' '+(j.name||'')+'</option>').join('');
   un.innerHTML=u.length?('<div style="font-size:11px;font-weight:700;color:#b45309;margin-bottom:6px">Unmatched rows</div>'+u.slice(0,30).map(x=>'<div style="display:flex;gap:6px;align-items:center;font-size:11px;padding:3px 0"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+x.t.raw+'">'+(x.t.person||'?')+' · '+x.t.hours+'h · '+x.t.raw.slice(0,60)+'</span><select class="inp" style="width:180px;font-size:11px;padding:3px 6px" onchange="jcAssignRow('+x.i+',this.value)">'+opts+'</select><button class="file-dl" style="background:#fee2e2;color:#b91c1c;padding:3px 7px;font-size:10px" onclick="JC.timesheet.splice('+x.i+',1);jcSave();jcRender()">✕</button></div>').join('')):'';
 }
+var JC_MISC_MAP={};
 function jcRenderMisc(){
   const sel=gel('jc-misc-job'); if(!sel) return;
-  sel.innerHTML='<option value="">— pick job —</option>'+(JOBS||[]).map(j=>'<option value="'+j.ref+'">'+j.ref+' '+(j.name||'')+'</option>').join('');
+  const dl=gel('jc-misc-joblist');
+  JC_MISC_MAP={};
+  if(dl){
+    dl.innerHTML=(JOBS||[]).map(function(j){
+      const disp=j.ref+' — '+(j.name||'')+(j.pc?(' · '+j.pc):'');
+      JC_MISC_MAP[disp.toLowerCase()]=j.ref;
+      JC_MISC_MAP[String(j.ref).toLowerCase()]=j.ref;
+      return '<option value="'+disp.replace(/"/g,'&quot;')+'"></option>';
+    }).join('');
+  }
   const list=gel('jc-misc-list');
   let html='';
   for(const j of (JOBS||[])){
-    const m=JC.jobs[j.ref]&&JC.jobs[j.ref].misc||[];
-    m.forEach((c,i)=>{ html+='<div style="display:flex;gap:8px;align-items:center;font-size:12px;padding:4px 0;border-bottom:1px solid var(--bdr)"><b style="min-width:90px;font-family:var(--mo);font-size:11px;color:var(--blue)">'+j.ref+'</b><span style="flex:1">'+c.label+'</span><span style="color:var(--ink3);font-size:10px">'+(c.date||'')+'</span><b>'+jcFmt(c.amount)+'</b><button class="file-dl" style="background:#fee2e2;color:#b91c1c;padding:3px 7px;font-size:10px" onclick="jcDelMisc(\''+j.ref+'\','+i+')">✕</button></div>'; });
+    const jc=JC.jobs[j.ref]; if(!jc) continue;
+    (jc.misc||[]).forEach((c,i)=>{ html+=jcCostRow(j.ref,'Misc',c,i,'misc','var(--blue)'); });
+    (jc.subbie||[]).forEach((c,i)=>{ html+=jcCostRow(j.ref,'Subbie',c,i,'subbie','#7c3aed'); });
   }
-  list.innerHTML=html||'<div style="font-size:12px;color:var(--ink3)">No misc costs yet.</div>';
+  list.innerHTML=html||'<div style="font-size:12px;color:var(--ink3)">No misc or subcontractor costs yet.</div>';
+}
+function jcCostRow(ref,tag,c,i,type,col){
+  return '<div style="display:flex;gap:8px;align-items:center;font-size:12px;padding:4px 0;border-bottom:1px solid var(--bdr)">'+
+    '<b style="min-width:74px;font-family:var(--mo);font-size:11px;color:var(--blue)">'+ref+'</b>'+
+    '<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:'+col+';min-width:44px">'+tag+'</span>'+
+    '<span style="flex:1">'+c.label+'</span>'+
+    '<span style="color:var(--ink3);font-size:10px">'+(c.date||'')+'</span>'+
+    '<b>'+jcFmt(c.amount)+'</b>'+
+    '<button class="file-dl" style="background:#fee2e2;color:#b91c1c;padding:3px 7px;font-size:10px" onclick="jcDelCost(\''+ref+'\',\''+type+'\','+i+')">✕</button></div>';
 }
 function jcSetField(ref, field, val){ jcJob(ref)[field]=val; jcSave(); jcRenderPL(); }
 function jcRenderPL(){
@@ -10226,8 +10287,9 @@ function jcShowDetail(ref){
     '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ink3);margin:8px 0 4px">Kit '+(kit.overridden?'(manual override)':'')+'</div>'+
     kit.lines.map(l=>'<div style="display:flex;font-size:12px;padding:2px 0'+(l.missing?';color:#b45309':'')+'"><span style="flex:1">'+l.label+'</span><b>'+jcFmt(l.amount)+'</b></div>').join('')+
     '<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><label style="font-size:11px;color:var(--ink3)">Kit override £ <input class="inp" type="number" value="'+(jc.kitOverride||'')+'" style="width:100px;font-size:11px;padding:4px 6px" onchange="jcSetField(\''+ref+'\',\'kitOverride\',this.value);jcShowDetail(\''+ref+'\')"></label><span style="font-size:10px;color:var(--ink3)">leave blank to use auto-pricing</span></div>'+
-    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ink3);margin:10px 0 4px">Labour — '+(Math.round(lab.hours*10)/10)+'h total</div>'+
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ink3);margin:10px 0 4px">Labour — '+(Math.round(lab.hours*10)/10)+'h · '+jcFmt(lab.total)+'</div>'+
     Object.keys(lab.byPerson).map(p=>'<div style="display:flex;font-size:12px;padding:2px 0"><span style="flex:1">'+p+'</span><span>'+(Math.round(lab.byPerson[p]*10)/10)+'h</span></div>').join('')+
+    ((lab.subbie&&lab.subbie.length)?('<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#7c3aed;margin:6px 0 2px">Subcontractor labour</div>'+lab.subbie.map(s=>'<div style="display:flex;font-size:12px;padding:2px 0"><span style="flex:1">'+s.label+'</span><b>'+jcFmt(s.amount)+'</b></div>').join('')):'')+
     '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ink3);margin:10px 0 4px">Scaffold — '+scf.src+'</div>'+
     '<div style="display:flex;gap:8px;align-items:center"><b style="font-size:12px">'+jcFmt(scf.total)+'</b><label style="font-size:11px;color:var(--ink3);margin-left:10px">Override £ <input class="inp" type="number" value="'+(jc.scaffOverride||'')+'" style="width:100px;font-size:11px;padding:4px 6px" onchange="jcSetField(\''+ref+'\',\'scaffOverride\',this.value);jcShowDetail(\''+ref+'\')"></label></div>'+
     '</div>';
