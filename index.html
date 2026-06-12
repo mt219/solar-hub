@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GreenGenUK · Solar PV Hub v41</title>
+<title>GreenGenUK · Solar PV Hub v50</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,700;0,800;1,700&family=Dancing+Script:wght@700&family=Caveat:wght@600&family=Pacifico&display=swap" rel="stylesheet">
 <!-- Supabase -->
 <script>
@@ -8655,6 +8655,31 @@ async function sbDeleteSO(id) {
 // LocalStorage fallbacks
 function finJobsLoadLocal(){ try{ FIN_JOBS=JSON.parse(localStorage.getItem('gguk_finjobs')||'[]'); }catch(e){ FIN_JOBS=[]; } }
 function finJobsStoreLocal(){ try{ localStorage.setItem('gguk_finjobs',JSON.stringify(FIN_JOBS)); }catch(e){} }
+// ── Pipeline auto-sync: pull live jobs into Finance. Income (value) comes from the
+//    sale price entered per job in Job Costing, so it's entered ONCE and feeds both
+//    the per-job P&L and the pipeline chart. Existing finance rows are preserved by ref.
+function finSyncFromJobs(){
+  try{ jcLoad(); }catch(e){}
+  const byRef={};
+  FIN_JOBS.forEach(r=>{ if(r&&r.ref) byRef[r.ref]=r; });
+  const today=new Date().toISOString().slice(0,10);
+  (JOBS||[]).forEach(j=>{
+    if(!j||!j.ref) return;
+    const sale=(typeof JC!=='undefined'&&JC.jobs&&JC.jobs[j.ref]&&parseFloat(JC.jobs[j.ref].sale))||0;
+    const month=(j.start&&/^\d{4}-\d{2}/.test(j.start))?j.start.slice(0,7):'';
+    const ex=byRef[j.ref];
+    if(ex){
+      if(sale>0) ex.value=sale;            // sale price in Job Costing is the source of truth
+      if(!ex.month&&month) ex.month=month;
+      if(!ex.name) ex.name=j.name||'';
+      if(!ex.type) ex.type=j.type||'';
+    } else {
+      const status=(month&&j.start<today)?'completed':'scheduled';
+      FIN_JOBS.push({ref:j.ref,name:j.name||'',type:j.type||'',value:sale,month:month,status:status,notes:'auto · from jobs list',id:Date.now()+Math.floor(Math.random()*100000)});
+    }
+  });
+  try{ finJobsStoreLocal(); }catch(e){}
+}
 function finLoadLocal(){ try{ FIN_ROWS=JSON.parse(localStorage.getItem('gguk_finance')||'[]'); }catch(e){ FIN_ROWS=[]; } }
 function finStoreLocal(){ try{ localStorage.setItem('gguk_finance',JSON.stringify(FIN_ROWS)); }catch(e){} }
 
@@ -8670,7 +8695,7 @@ function finTab(t){
     if(btn){ btn.style.background=tab===t?'var(--grn)':'var(--bg)'; btn.style.color=tab===t?'#fff':'var(--ink3)'; }
     if(pane) pane.style.display=tab===t?'':'none';
   });
-  if(t==='monthly') renderMonthly();
+  if(t==='monthly'){ finSyncFromJobs(); renderMonthly(); }
   if(t==='milestones'){ renderMilestones(); renderFinance(); }
   if(t==='subs'){ subLoad(); renderSubTable(); renderSubRegions(); }
   if(t==='pl'){ renderPL(); }
@@ -9898,7 +9923,7 @@ const _origGoSection = goSection;
 goSection = function(id){
   _origGoSection(id);
   if(id==='finance'){
-    finJobsLoad();finLoad();renderFinSummary();renderFJTable();
+    finJobsLoad();finLoad();finSyncFromJobs();renderFinSummary();renderFJTable();
     const ys=gel('fin-year-select');
     if(ys&&!ys.options.length){const y=new Date().getFullYear();[y-1,y,y+1].forEach(yr=>{const o=document.createElement('option');o.value=yr;o.textContent=yr;ys.appendChild(o);});ys.value=y;}
     const loadChart=()=>{renderMonthly();};
