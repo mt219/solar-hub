@@ -7589,12 +7589,6 @@ ctLoad();
   console.log('[Scaffold Seed] CT_DATA already loaded inline');
 })();
 
-fillForm();
-refreshUI();
-updateDSBadge();
-updateWarrantyBadge();
-gdInit();
-
 // ════════════════════════════════════════════════════════════
 // MAY 2026 BATCH IMPORT
 // ════════════════════════════════════════════════════════════
@@ -10439,6 +10433,17 @@ function genScaffPlan(){
     localStorage.setItem('gguk_seed_plan_v1','1');
   }catch(e){}
 })();
+
+// Init calls moved here (from mid-script) so they run only after every
+// top-level let/const in this file has been declared. Calling them earlier
+// throws a TDZ ReferenceError (e.g. "Cannot access 'FIN_JOBS'/'SUB_LIST' before
+// initialization") which silently aborts the rest of the script, leaving those
+// variables permanently uninitialized — that's what broke the Monthly Pipeline tab.
+fillForm();
+refreshUI();
+updateDSBadge();
+updateWarrantyBadge();
+gdInit();
 
 </script>
 </body>
