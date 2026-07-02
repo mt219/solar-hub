@@ -9165,6 +9165,7 @@ async function soSave(){
   if(!row.ref&&!row.name){alert('Please enter a job ref or customer name.');return;}
   if(!row.date){alert('Please enter the completion date.');return;}
   SO_LOG.unshift(row);
+  soStoreLocal();
   await sbUpsertSO(row);
   renderSOTable();renderKPIMetrics();
   ['so-ref','so-name','so-crew','so-notes'].forEach(id=>{const e=gel(id);if(e)e.value='';});
@@ -9175,6 +9176,7 @@ function soDelete(idx){
   if(!confirm('Remove this sign-off?'))return;
   const id=SO_LOG[idx]?.id;
   SO_LOG.splice(idx,1);
+  soStoreLocal();
   if(id) sbDeleteSO(id);
   renderSOTable();renderKPIMetrics();
 }
@@ -9223,7 +9225,9 @@ async function parsePasteList(){
       const row={...j,id:Date.now()+Math.random()};
       SO_LOG.unshift(row);
       await sbUpsertSO(row);
-    }renderSOTable();renderKPIMetrics();
+    }
+    soStoreLocal();
+    renderSOTable();renderKPIMetrics();
     out.innerHTML=`✅ Added <strong>${jobs.length} installs</strong> to sign-off log:<br>${jobs.map(j=>`• ${j.ref||'?'} ${j.name} — ${j.date}`).join('<br>')}`;
     const pi=gel('paste-input');if(pi)pi.value='';
   }catch(e){out.innerHTML='Error: '+e.message;}
