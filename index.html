@@ -418,6 +418,10 @@ select.ei{cursor:pointer}
       <div class="fg">
         <div class="fld"><label>Install start date</label><input class="inp" type="date" id="i-start" oninput="F('start',this.value)"></div>
         <div class="fld"><label>Install end date</label><input class="inp" type="date" id="i-end" oninput="F('end',this.value)"></div>
+        <div class="fld"><label>Roof first fix</label><input class="inp" type="date" id="i-roofff" oninput="F('roofFF',this.value)"></div>
+        <div class="fld"><label>Roof second fix</label><input class="inp" type="date" id="i-roofsf" oninput="F('roofSF',this.value)"></div>
+        <div class="fld"><label>Electrical first fix</label><input class="inp" type="date" id="i-elecff" oninput="F('elecFF',this.value)"></div>
+        <div class="fld"><label>Electrical second fix</label><input class="inp" type="date" id="i-elecsf" oninput="F('elecSF',this.value)"></div>
         <div class="fld"><label>MPAN</label><input class="inp" id="i-mpan" placeholder="e.g. 2200024129063" oninput="F('mpan',this.value)"></div>
         <div class="fld"><label>Electrical phase</label>
           <select class="inp" id="i-phase" onchange="F('phase',this.value)">
@@ -1469,7 +1473,7 @@ select.ei{cursor:pointer}
     </div>
     <div class="card">
       <div class="card-head"><div class="ch-icon" style="background:#fef3c7">📊</div><div><div class="ch-title">Pipeline chart</div><div class="ch-sub">Contract value per month</div></div></div>
-      <div class="card-body"><canvas id="fin-chart" style="width:100%;height:220px;display:block"></canvas></div>
+      <div class="card-body"><div style="position:relative;height:260px"><canvas id="fin-chart" style="display:block"></canvas></div></div>
     </div>
   </div>
 
@@ -1727,7 +1731,7 @@ Ref 12196 (Jenny Roe) done 16 May, Fox ESS, on time
         <div><div class="ch-title">Installs per week vs target</div><div class="ch-sub">Weekly sign-offs — bars are actuals, drag the target line up/down</div></div>
       </div>
       <div class="card-body" style="position:relative">
-        <canvas id="kpi-chart" style="width:100%;height:220px;display:block"></canvas>
+        <div style="position:relative;height:260px"><canvas id="kpi-chart" style="display:block"></canvas></div>
         <div style="font-size:11px;color:var(--ink3);margin-top:4px;text-align:center">Drag the <span style="color:#6366f1;font-weight:700">purple target line</span> on any week to adjust — targets grow over time</div>
       </div>
     </div>
@@ -1735,28 +1739,28 @@ Ref 12196 (Jenny Roe) done 16 May, Fox ESS, on time
     <div class="card">
       <div class="card-head"><div class="ch-icon" style="background:#d1fae5">⚡</div><div><div class="ch-title">kWp of roof PV — last 8 weeks</div><div class="ch-sub">Drag the target line to set kWp target per week</div></div></div>
       <div class="card-body">
-        <canvas id="kpi-chart-kwp" style="width:100%;height:180px;display:block"></canvas>
+        <div style="position:relative;height:220px"><canvas id="kpi-chart-kwp" style="display:block"></canvas></div>
       </div>
     </div>
     <!-- kWh battery installed -->
     <div class="card">
       <div class="card-head"><div class="ch-icon" style="background:#ede9fe">🔋</div><div><div class="ch-title">kWh of battery storage — last 8 weeks</div><div class="ch-sub">Drag the target line to set kWh target per week</div></div></div>
       <div class="card-body">
-        <canvas id="kpi-chart-kwh" style="width:100%;height:180px;display:block"></canvas>
+        <div style="position:relative;height:220px"><canvas id="kpi-chart-kwh" style="display:block"></canvas></div>
       </div>
     </div>
     <!-- Earned value -->
     <div class="card">
       <div class="card-head"><div class="ch-icon" style="background:#fef3c7">💰</div><div><div class="ch-title">Earned value (£) — last 8 weeks</div><div class="ch-sub">Contract value of signed-off installs per week — drag to set target</div></div></div>
       <div class="card-body">
-        <canvas id="kpi-chart-ev" style="width:100%;height:180px;display:block"></canvas>
+        <div style="position:relative;height:220px"><canvas id="kpi-chart-ev" style="display:block"></canvas></div>
       </div>
     </div>
     <!-- Cumulative earned value -->
     <div class="card">
-      <div class="card-head"><div class="ch-icon" style="background:#fef3c7">💰</div><div><div class="ch-title">Cumulative earned value — cash flow</div><div class="ch-sub">Actual received (solid) vs projected from payment schedule (dotted)</div></div></div>
+      <div class="card-head"><div class="ch-icon" style="background:#fef3c7">💰</div><div><div class="ch-title">Cumulative earned value — cash flow</div><div class="ch-sub">Received to date (solid, assumes on-time) vs projected schedule (dotted)</div></div></div>
       <div class="card-body" id="kpi-earned-value">
-        <canvas id="kpi-earned-chart" style="width:100%;height:220px;display:block"></canvas>
+        <div style="position:relative;height:260px"><canvas id="kpi-earned-chart" style="display:block"></canvas></div>
       </div>
     </div>
     <!-- hidden legacy elements for compat -->
@@ -1899,6 +1903,7 @@ const BLANK = () => ({
   name:'', ref:'', a1:'', a2:'', a3:'', pc:'', ph:'', em:'',
   contractValue:0,
   start:'', end:'', type:'', roof:'', roofOther:'',
+  roofFF:'', roofSF:'', elecFF:'', elecSF:'',
   invloc:'', mains:'', notes:'', scafUp:'', scafDown:'',
   staff: [{role:'Electrician',name:''},{role:'Roofer',name:''}],
   panels: [{brand:'',model:'',wp:'',qty:''}],
@@ -2452,6 +2457,7 @@ function fillForm() {
   const map = {
     'i-name':'name','i-ref':'ref','i-a1':'a1','i-a2':'a2','i-a3':'a3',
     'i-pc':'pc','i-ph':'ph','i-em':'em','i-start':'start','i-end':'end',
+    'i-roofff':'roofFF','i-roofsf':'roofSF','i-elecff':'elecFF','i-elecsf':'elecSF',
     'i-type':'type','i-roof':'roof','i-roof-other':'roofOther',
     'i-invloc':'invloc','i-mains':'mains','i-notes':'notes',
     'i-scafup':'scafUp','i-scafdown':'scafDown','p-voc':'pVoc','p-isc':'pIsc','i-phase':'phase','i-dnoref':'dnoRef','i-mpan':'mpan'
@@ -2511,6 +2517,7 @@ function saveJob() {
   const map = {
     'i-name':'name','i-ref':'ref','i-a1':'a1','i-a2':'a2','i-a3':'a3',
     'i-pc':'pc','i-ph':'ph','i-em':'em','i-start':'start','i-end':'end',
+    'i-roofff':'roofFF','i-roofsf':'roofSF','i-elecff':'elecFF','i-elecsf':'elecSF',
     'i-type':'type','i-roof':'roof','i-roof-other':'roofOther',
     'i-invloc':'invloc','i-mains':'mains','i-notes':'notes',
     'i-scafup':'scafUp','i-scafdown':'scafDown','p-voc':'pVoc','p-isc':'pIsc',
@@ -8885,6 +8892,33 @@ function renderMonthly(){
   else{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js';s.onload=drawPipelineChart;document.head.appendChild(s);}
 }
 
+// ── PAYMENT SCHEDULE (single source of truth) ──
+// 10% deposit (taken before the job is entered) + three stage payments.
+// Stage-payment dates are driven by the roof / electrical fix dates when set,
+// falling back to the legacy scaffold / install / handover dates so older jobs
+// (with no fix dates) still schedule exactly as before.
+//
+// DEFAULT STAGE MAPPING — edit the three lines marked ► to change how payments
+// attach to the fix stages:
+//   Advance 50%      ► Roof first fix        (fallback: 2 wks before scaffold, else 1 wk before install start)
+//   Installation 35% ► Electrical first fix  (fallback: install end, else install start)
+//   Commissioning 5% ► Electrical second fix (fallback: handover date)
+function jobPaymentSchedule(j){
+  const cv=parseFloat(j.contractValue)||0;
+  const addDays=(d,n)=>{ const dt=new Date(d+'T12:00:00'); dt.setDate(dt.getDate()+n); return dt.toISOString().slice(0,10); };
+  const hasScaff=!!(j.scafUp);
+  const advFallback=hasScaff?addDays(j.scafUp,-14):(j.start?addDays(j.start,-7):'');
+  const advDate  = j.roofFF || advFallback;                 // ► advance
+  const instDate = j.elecFF || j.end || j.start || '';       // ► installation
+  const commDate = j.elecSF || j.hDate || '';                // ► commissioning
+  return { cv, milestones:[
+    {pct:10, label:'Deposit (10%)',       date:'—',      note:'Received before job entered app'},
+    {pct:50, label:'Advance (50%)',       date:advDate,  note:j.roofFF?'Roof first fix':(hasScaff?'2 wks before scaffold up':'1 wk before install')},
+    {pct:35, label:'Installation (35%)',  date:instDate, note:j.elecFF?'Electrical first fix':'On install complete'},
+    {pct:5,  label:'Commissioning (5%)',  date:commDate, note:j.elecSF?'Electrical second fix':'On handover'},
+  ]};
+}
+
 // ── AUTO PAYMENT MILESTONES (from JOBS data) ──
 function renderMilestones(){
   finJobsLoad();
@@ -8919,17 +8953,8 @@ function renderMilestones(){
 
   let allRows=[];
   JOBS.forEach(j=>{
-    const cv=parseFloat(j.contractValue)||0;
+    const {cv, milestones}=jobPaymentSchedule(j);
     if(!cv) return; // skip jobs with no contract value
-    const hasScaff=!!(j.scafUp);
-    // Advance payment date: 2 weeks before scaffold, or 1 week before install
-    const advDate=hasScaff ? addDays(j.scafUp,-14) : (j.start ? addDays(j.start,-7) : '');
-    const milestones=[
-      {label:'Deposit (10%)',    pct:10, date:'—',      note:'Received before job entered app'},
-      {label:'Advance (50%)',    pct:50, date:advDate,   note:hasScaff?'2 wks before scaffold up':'1 wk before install'},
-      {label:'Installation (35%)',pct:35,date:j.end||j.start||'', note:'On install complete'},
-      {label:'Commissioning (5%)',pct:5, date:j.hDate||'',         note:'On handover'},
-    ];
     milestones.forEach((m,i)=>{
       const amount=cv*(m.pct/100);
       // Filter by year
@@ -8989,22 +9014,19 @@ function renderMilestones(){
 
 function renderFinSummary(){
   finJobsLoad(); finLoad();
-  // Derive totals from payment schedule (JOBS data), not manual FIN_ROWS
-  const addDays=(d,n)=>{ const dt=new Date(d+'T12:00:00'); dt.setDate(dt.getDate()+n); return dt.toISOString().slice(0,10); };
+  // Payment timing assumes every stage payment is received on its due date —
+  // so anything due on or before today is treated as received, nothing is overdue.
   const today=new Date().toISOString().slice(0,10);
   const scheduled=FIN_JOBS.filter(r=>r.status==='scheduled').reduce((a,r)=>a+r.value,0);
   const completed=FIN_JOBS.filter(r=>r.status==='completed').reduce((a,r)=>a+r.value,0);
-  // Build outstanding from auto payment schedule
-  let schedOutstanding=0, schedOverdue=0;
+  // Received-to-date vs upcoming, from the auto payment schedule (deposit excluded)
+  let receivedToDate=0, upcoming=0;
   JOBS.filter(j=>!j._archived).forEach(j=>{
-    const cv=parseFloat(j.contractValue)||0; if(!cv)return;
-    const hasScaff=!!(j.scafUp);
-    const advDate=hasScaff?addDays(j.scafUp,-14):(j.start?addDays(j.start,-7):'');
-    [{pct:50,date:advDate},{pct:35,date:j.end||j.start||''},{pct:5,date:j.hDate||''}].forEach(m=>{
-      if(!m.date)return;
+    const {cv, milestones}=jobPaymentSchedule(j); if(!cv)return;
+    milestones.forEach(m=>{
+      if(m.pct===10 || !m.date || m.date==='—') return;
       const amt=cv*(m.pct/100);
-      schedOutstanding+=amt;
-      if(m.date<today) schedOverdue+=amt;
+      if(m.date<=today) receivedToDate+=amt; else upcoming+=amt;
     });
   });
   const s=gel('fin-summary');
@@ -9012,8 +9034,8 @@ function renderFinSummary(){
   s.innerHTML=[
     {l:'Scheduled pipeline',v:'£'+scheduled.toLocaleString('en-GB'),c:'#d97706'},
     {l:'Completed this year',v:'£'+completed.toLocaleString('en-GB'),c:'#059669'},
-    {l:'Schedule outstanding',v:'£'+Math.round(schedOutstanding).toLocaleString('en-GB'),c:'#7c3aed'},
-    {l:'Schedule overdue',v:'£'+Math.round(schedOverdue).toLocaleString('en-GB'),c:schedOverdue>0?'#dc2626':'#059669'},
+    {l:'Received to date',v:'£'+Math.round(receivedToDate).toLocaleString('en-GB'),c:'#059669'},
+    {l:'Upcoming payments',v:'£'+Math.round(upcoming).toLocaleString('en-GB'),c:'#7c3aed'},
   ].map(m=>`<div style="background:var(--card);border:1.5px solid var(--bdr);border-radius:10px;padding:12px 14px">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:4px">${m.l}</div>
     <div style="font-size:20px;font-weight:700;color:${m.c};font-family:var(--mo)">${m.v}</div>
@@ -9053,7 +9075,7 @@ function finEdit(idx){
   finTab('milestones');
 }
 function finDelete(idx){if(!confirm('Delete?'))return;const id=FIN_ROWS[idx]?.id;FIN_ROWS.splice(idx,1);if(id)sbDeleteFinRow(id);renderFinance();renderFinSummary();}
-function finMarkPaid(idx){if(FIN_ROWS[idx]){FIN_ROWS[idx].status='paid';sbUpsertFinRow(FIN_ROWS[idx]);renderFinance();renderFinSummary();}}
+function finMarkPaid(idx){ /* retired — payments are assumed received on their due date; no paid/unpaid tracking */ }
 
 function renderFinance(){ /* no-op — manual milestone log removed; schedule auto-calculated from JOBS */ }
 
@@ -9444,6 +9466,10 @@ function makeDraggableTargetChart(canvasId, labels, barData, barColor, metricKey
 }
 
 function renderKPIChart(){
+  // Only build charts when the chart pane is visible — Chart.js measures a hidden
+  // (display:none) canvas as zero-size, which is what made the graphs render broken.
+  const chartPane=gel('kpi-pane-chart');
+  if(chartPane && chartPane.style.display==='none') return;
   soLoad();
   KPI_DRAG_TARGETS=loadDragTargets();
   const now=new Date();
@@ -9481,19 +9507,14 @@ function renderKPIChart(){
   // Cumulative earned value chart (unchanged)
   const earnedCanvas=gel('kpi-earned-chart');
   if(earnedCanvas){
-    const addDays=(d,n)=>{ const dt=new Date(d+'T12:00:00'); dt.setDate(dt.getDate()+n); return dt.toISOString().slice(0,10); };
+    // Projected schedule events from the payment schedule (driven by fix dates).
     const projEvents=[];
     JOBS.filter(j=>!j._archived).forEach(j=>{
-      const cv=parseFloat(j.contractValue)||0; if(!cv)return;
-      const hasScaff=!!(j.scafUp);
-      const advDate=hasScaff?addDays(j.scafUp,-14):(j.start?addDays(j.start,-7):'');
-      if(advDate) projEvents.push({date:advDate,amount:cv*0.50});
-      const instDate=j.end||j.start||''; if(instDate) projEvents.push({date:instDate,amount:cv*0.35});
-      const commDate=j.hDate||''; if(commDate) projEvents.push({date:commDate,amount:cv*0.05});
+      const {cv, milestones}=jobPaymentSchedule(j); if(!cv)return;
+      milestones.forEach(m=>{ if(m.pct===10||!m.date||m.date==='—')return; projEvents.push({date:m.date,amount:cv*(m.pct/100)}); });
     });
     projEvents.sort((a,b)=>a.date.localeCompare(b.date));
-    const paidEvents=[...FIN_ROWS.filter(r=>r.status==='paid'&&r.due)].map(r=>({date:r.due,amount:parseFloat(r.amount)||0})).sort((a,b)=>a.date.localeCompare(b.date));
-    const allDates=[...projEvents.map(e=>e.date),...paidEvents.map(e=>e.date)].filter(Boolean).sort();
+    const allDates=[...projEvents.map(e=>e.date)].filter(Boolean).sort();
     if(!allDates.length){
       earnedCanvas.parentElement.innerHTML='<div style="font-size:13px;color:var(--ink3);padding:16px">No jobs with contract values and dates set.</div>';
     } else {
@@ -9506,14 +9527,14 @@ function renderKPIChart(){
       let projCum=0;
       const projData=monthLabels.map(m=>{ projEvents.filter(e=>e.date.slice(0,7)===m).forEach(e=>projCum+=e.amount); return Math.round(projCum); });
       const todayYM=new Date().toISOString().slice(0,7);
-      let paidCum=0;
-      const paidData=monthLabels.map(m=>{ if(m>todayYM) return null; paidEvents.filter(e=>e.date.slice(0,7)===m).forEach(e=>paidCum+=e.amount); return Math.round(paidCum); });
+      // Assumes every payment is received on its due date, so received-to-date tracks the schedule up to this month.
+      const paidData=monthLabels.map((m,i)=> m>todayYM ? null : projData[i]);
       if(KPI_CHART_EARNED){try{KPI_CHART_EARNED.destroy();}catch(e){}}
       KPI_CHART_EARNED=new Chart(earnedCanvas.getContext('2d'),{
         type:'line',
         data:{labels:monthLabels.map(fmtLabel),datasets:[
           {label:'Projected (schedule)',data:projData,borderColor:'#d97706',backgroundColor:'rgba(217,119,6,0.08)',borderWidth:2,borderDash:[6,4],pointRadius:3,pointBackgroundColor:'#d97706',fill:true,tension:0.3},
-          {label:'Actual received',data:paidData,borderColor:'#059669',backgroundColor:'rgba(5,150,105,0.10)',borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#059669',fill:false,tension:0.3,spanGaps:false}
+          {label:'Received to date (on-time basis)',data:paidData,borderColor:'#059669',backgroundColor:'rgba(5,150,105,0.10)',borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#059669',fill:false,tension:0.3,spanGaps:false}
         ]},
         options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11},usePointStyle:true}},tooltip:{callbacks:{label:ctx=>' £'+ctx.parsed.y.toLocaleString('en-GB')}}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.05)'},ticks:{callback:v=>'£'+v.toLocaleString('en-GB')}},x:{grid:{display:false}}}}
       });
