@@ -1655,6 +1655,7 @@ select.ei{cursor:pointer}
     <button id="kpi-tab-signoff" onclick="kpiTab('signoff')" style="flex:1;padding:10px;font-size:13px;font-weight:600;background:var(--grn);color:#fff;border:none;cursor:pointer">✅ Sign off installs</button>
     <button id="kpi-tab-paste" onclick="kpiTab('paste')" style="flex:1;padding:10px;font-size:13px;font-weight:600;background:var(--bg);color:var(--ink3);border:none;cursor:pointer;border-left:1.5px solid var(--bdr)">📋 Paste completed list</button>
     <button id="kpi-tab-chart" onclick="kpiTab('chart')" style="flex:1;padding:10px;font-size:13px;font-weight:600;background:var(--bg);color:var(--ink3);border:none;cursor:pointer;border-left:1.5px solid var(--bdr)">📊 Throughput chart</button>
+    <button id="kpi-tab-scheduled" onclick="kpiTab('scheduled')" style="flex:1;padding:10px;font-size:13px;font-weight:600;background:var(--bg);color:var(--ink3);border:none;cursor:pointer;border-left:1.5px solid var(--bdr)">📅 Scheduled ahead</button>
     <button id="kpi-tab-actions" onclick="kpiTab('actions')" style="flex:1;padding:10px;font-size:13px;font-weight:600;background:var(--bg);color:var(--ink3);border:none;cursor:pointer;border-left:1.5px solid var(--bdr)">⚠ Actions</button>
   </div>
 
@@ -1758,13 +1759,26 @@ Ref 12196 (Jenny Roe) done 16 May, Fox ESS, on time
     </div>
     <!-- Cumulative earned value -->
     <div class="card">
-      <div class="card-head"><div class="ch-icon" style="background:#fef3c7">💰</div><div><div class="ch-title">Cumulative earned value — cash flow</div><div class="ch-sub">Received to date (solid, assumes on-time) vs projected schedule (dotted)</div></div></div>
+      <div class="card-head"><div class="ch-icon" style="background:#fef3c7">💰</div><div><div class="ch-title">Cumulative earned value (EVM)</div><div class="ch-sub">Planned value — scheduled contract value (dashed) vs earned value of completed installs (solid)</div></div></div>
       <div class="card-body" id="kpi-earned-value">
         <div style="position:relative;height:260px"><canvas id="kpi-earned-chart" style="display:block"></canvas></div>
       </div>
     </div>
     <!-- hidden legacy elements for compat -->
     <div id="target-editor" style="display:none"><input type="date" id="tgt-date"><input type="number" id="tgt-value"><div id="tgt-history"></div></div>
+  </div>
+
+  <!-- SCHEDULED-AHEAD TAB -->
+  <div id="kpi-pane-scheduled" style="display:none">
+    <div class="card">
+      <div class="card-head">
+        <div class="ch-icon" style="background:#dbeafe">📅</div>
+        <div><div class="ch-title">Booked-in installs ahead</div><div class="ch-sub" id="kpi-sched-sub">Jobs with an install date from today onwards</div></div>
+        <div style="margin-left:auto"><button class="btn btn-green btn-xs" onclick="renderKPIScheduled()">↻</button></div>
+      </div>
+      <div class="card-body"><div id="kpi-sched-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:8px"></div></div>
+      <div id="kpi-sched-body"></div>
+    </div>
   </div>
 
   <!-- ACTIONS TAB -->
@@ -2447,6 +2461,8 @@ function goSection(id) {
   if(id==='saved') { renderSaved(); }
   if(id==='costs') { ctLoad(); ctPopulateQuarterSelect(); renderCostTracker(); }
   if(id==='jobcosting') { jcInit(); }
+  if(id==='finance') { finSyncFromJobs(); renderFJTable(); renderFinSummary(); renderMilestones(); }
+  if(id==='kpi') { renderKPIMetrics(); renderSOTable(); renderKPIScheduled(); }
   window.scrollTo(0,0);
 }
 
@@ -5669,11 +5685,8 @@ function htmlPreInstall(j) {
       ${staffRows}
     </table>
 
-    ${j.notes?`
     <div style="background:#1F3864;color:#fff;font-weight:bold;font-size:10pt;padding:5pt 8pt;margin-bottom:2mm">SURVEYOR NOTES</div>
-    <div style="border:1px solid #999;padding:8pt;min-height:25mm;font-size:9pt;white-space:pre-wrap;line-height:1.6">${esc(j.notes)}</div>`:`
-    <div style="background:#1F3864;color:#fff;font-weight:bold;font-size:10pt;padding:5pt 8pt;margin-bottom:2mm">SURVEYOR NOTES</div>
-    <div style="border:1px solid #999;padding:8pt;min-height:25mm"></div>`}
+    <div style="border:1px solid #999;padding:8pt;min-height:25mm"></div>
 
     <div class="footer-doc">
       <span>Pre-Install Notes · GreenGenUK Limited · MCS NIC1909</span>
@@ -8683,16 +8696,20 @@ function finSyncFromJobs(){
   (JOBS||[]).forEach(j=>{
     if(!j||!j.ref) return;
     const sale=(typeof JC!=='undefined'&&JC.jobs&&JC.jobs[j.ref]&&parseFloat(JC.jobs[j.ref].sale))||0;
+    // Income source of truth: Job Costing sale price if entered, otherwise the
+    // Contract value (£) entered on the job details tab. This is why contract
+    // values entered against a job now feed straight into Finance & pipeline.
+    const income = sale>0 ? sale : (parseFloat(j.contractValue)||0);
     const month=(j.start&&/^\d{4}-\d{2}/.test(j.start))?j.start.slice(0,7):'';
     const ex=byRef[j.ref];
     if(ex){
-      if(sale>0) ex.value=sale;            // sale price in Job Costing is the source of truth
+      if(income>0) ex.value=income;        // sale price, else job contract value
       if(!ex.month&&month) ex.month=month;
       if(!ex.name) ex.name=j.name||'';
       if(!ex.type) ex.type=j.type||'';
     } else {
       const status=(month&&j.start<today)?'completed':'scheduled';
-      FIN_JOBS.push({ref:j.ref,name:j.name||'',type:j.type||'',value:sale,month:month,status:status,notes:'auto · from jobs list',id:Date.now()+Math.floor(Math.random()*100000)});
+      FIN_JOBS.push({ref:j.ref,name:j.name||'',type:j.type||'',value:income,month:month,status:status,notes:'auto · from jobs list',id:Date.now()+Math.floor(Math.random()*100000)});
     }
   });
   try{ finJobsStoreLocal(); }catch(e){}
@@ -9164,12 +9181,13 @@ function soClearSearch(){
 }
 
 function kpiTab(t){
-  ['signoff','paste','chart','actions'].forEach(tab=>{
+  ['signoff','paste','chart','scheduled','actions'].forEach(tab=>{
     const btn=gel('kpi-tab-'+tab),pane=gel('kpi-pane-'+tab);
     if(btn){btn.style.background=tab===t?'var(--grn)':'var(--bg)';btn.style.color=tab===t?'#fff':'var(--ink3)';}
     if(pane)pane.style.display=tab===t?'':'none';
   });
   if(t==='chart')renderKPIChart();
+  if(t==='scheduled')renderKPIScheduled();
   if(t==='actions')renderKPIActions();
 }
 
@@ -9269,9 +9287,13 @@ function renderKPIMetrics(){
   const scheduledThisMonth=thisMonthJobs.length;
   // Annual revenue progress from payment schedule
   const thisYear=now.getFullYear()+'';
-  const annualEV=FIN_JOBS.filter(r=>r.month&&r.month.startsWith(thisYear)).reduce((s,r)=>s+(r.contractValue||0),0);
+  const annualEV=FIN_JOBS.filter(r=>r.month&&r.month.startsWith(thisYear)).reduce((s,r)=>s+(parseFloat(r.value)||0),0);
   const annualTarget=goals.annualRevenue||0;
   const annualPct=annualTarget>0?Math.min(100,Math.round(annualEV/annualTarget*100)):null;
+  // Forward-looking: jobs with an install date from today onwards
+  const todayStr=now.toISOString().slice(0,10);
+  const upcoming=(JOBS||[]).filter(j=>j&&!j._archived&&j.start&&j.start>=todayStr);
+  const upcomingVal=upcoming.reduce((a,j)=>a+(parseFloat(j.contractValue)||0),0);
   const m=gel('kpi-metrics');
   if(!m)return;
   const cards=[
@@ -9279,6 +9301,7 @@ function renderKPIMetrics(){
     {l:'Total signed off',v:SO_LOG.length,sub:'All time',c:'#1e40af'},
     {l:'Overrun rate',v:overrunRate+'%',sub:'Target: <'+goals.overrunPct+'%',c:overrunRate<=goals.overrunPct?'#059669':overrunRate<=(goals.overrunPct*2)?'#d97706':'#dc2626'},
     {l:'This month',v:completedThisMonth+'/'+scheduledThisMonth,sub:'Completed / scheduled',c:completedThisMonth>=scheduledThisMonth?'#059669':'#d97706'},
+    {l:'Booked ahead',v:upcoming.length,sub:'£'+upcomingVal.toLocaleString('en-GB')+' to come',c:'#0ea5e9'},
   ];
   if(annualTarget>0){
     cards.push({l:'Annual revenue target',v:'£'+(annualEV>=1e6?(annualEV/1e6).toFixed(2)+'m':(annualEV/1e3).toFixed(0)+'k'),sub:(annualPct+'% of £'+(annualTarget>=1e6?(annualTarget/1e6).toFixed(1)+'m':(annualTarget/1e3).toFixed(0)+'k')+' target'),c:annualPct>=80?'#059669':annualPct>=50?'#d97706':'#dc2626'});
@@ -9504,39 +9527,39 @@ function renderKPIChart(){
   KPI_CHART_KWH=makeDraggableTargetChart('kpi-chart-kwh',labels,kwhWeeks,'#7c3aed','kwh',50,'kWh',KPI_CHART_KWH);
   KPI_CHART_EV=makeDraggableTargetChart('kpi-chart-ev',labels,evWeeks,'#d97706','ev',50000,'£',KPI_CHART_EV);
 
-  // Cumulative earned value chart (unchanged)
+  // Cumulative earned value — EVM style: Planned Value (scheduled) vs Earned Value (completed)
   const earnedCanvas=gel('kpi-earned-chart');
   if(earnedCanvas){
-    // Projected schedule events from the payment schedule (driven by fix dates).
-    const projEvents=[];
-    JOBS.filter(j=>!j._archived).forEach(j=>{
-      const {cv, milestones}=jobPaymentSchedule(j); if(!cv)return;
-      milestones.forEach(m=>{ if(m.pct===10||!m.date||m.date==='—')return; projEvents.push({date:m.date,amount:cv*(m.pct/100)}); });
-    });
-    projEvents.sort((a,b)=>a.date.localeCompare(b.date));
-    const allDates=[...projEvents.map(e=>e.date)].filter(Boolean).sort();
-    if(!allDates.length){
-      earnedCanvas.parentElement.innerHTML='<div style="font-size:13px;color:var(--ink3);padding:16px">No jobs with contract values and dates set.</div>';
+    const cvOf=j=>parseFloat(j.contractValue)||0;
+    // Planned value: full contract value of each job booked to its scheduled install month
+    const pvEvents=JOBS.filter(j=>!j._archived&&j.start&&/^\d{4}-\d{2}/.test(j.start)&&cvOf(j)>0)
+      .map(j=>({month:j.start.slice(0,7),amount:cvOf(j)}));
+    // Earned value: contract value of jobs actually signed off, recognised at the completion month
+    soLoad();
+    const jobByRef={}; JOBS.forEach(j=>{ if(j&&j.ref) jobByRef[j.ref]=j; });
+    const evEvents=SO_LOG.filter(r=>r.date&&/^\d{4}-\d{2}/.test(r.date))
+      .map(r=>{ const j=jobByRef[r.ref]; return {month:r.date.slice(0,7),amount:j?cvOf(j):0}; })
+      .filter(e=>e.amount>0);
+    const allMonths=[...pvEvents.map(e=>e.month),...evEvents.map(e=>e.month)].filter(Boolean).sort();
+    if(!allMonths.length){
+      earnedCanvas.parentElement.innerHTML='<div style="font-size:13px;color:var(--ink3);padding:16px">No jobs with contract values and install dates set yet.</div>';
     } else {
-      const startMs=new Date(allDates[0].slice(0,7)+'-01');
-      const endDate=new Date(allDates[allDates.length-1].slice(0,7)+'-01');
-      endDate.setMonth(endDate.getMonth()+2);
-      const monthLabels=[]; const cur=new Date(startMs);
+      const startM=allMonths[0], endM=allMonths[allMonths.length-1];
+      const monthLabels=[]; const cur=new Date(startM+'-01');
+      const endDate=new Date(endM+'-01'); endDate.setMonth(endDate.getMonth()+1);
       while(cur<=endDate){ monthLabels.push(cur.toISOString().slice(0,7)); cur.setMonth(cur.getMonth()+1); }
       const fmtLabel=m=>new Date(m+'-15').toLocaleDateString('en-GB',{month:'short',year:'2-digit'});
-      let projCum=0;
-      const projData=monthLabels.map(m=>{ projEvents.filter(e=>e.date.slice(0,7)===m).forEach(e=>projCum+=e.amount); return Math.round(projCum); });
+      let pvCum=0; const pvData=monthLabels.map(m=>{ pvEvents.filter(e=>e.month===m).forEach(e=>pvCum+=e.amount); return Math.round(pvCum); });
       const todayYM=new Date().toISOString().slice(0,7);
-      // Assumes every payment is received on its due date, so received-to-date tracks the schedule up to this month.
-      const paidData=monthLabels.map((m,i)=> m>todayYM ? null : projData[i]);
+      let evCum=0; const evData=monthLabels.map(m=>{ evEvents.filter(e=>e.month===m).forEach(e=>evCum+=e.amount); return m>todayYM?null:Math.round(evCum); });
       if(KPI_CHART_EARNED){try{KPI_CHART_EARNED.destroy();}catch(e){}}
       KPI_CHART_EARNED=new Chart(earnedCanvas.getContext('2d'),{
         type:'line',
         data:{labels:monthLabels.map(fmtLabel),datasets:[
-          {label:'Projected (schedule)',data:projData,borderColor:'#d97706',backgroundColor:'rgba(217,119,6,0.08)',borderWidth:2,borderDash:[6,4],pointRadius:3,pointBackgroundColor:'#d97706',fill:true,tension:0.3},
-          {label:'Received to date (on-time basis)',data:paidData,borderColor:'#059669',backgroundColor:'rgba(5,150,105,0.10)',borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#059669',fill:false,tension:0.3,spanGaps:false}
+          {label:'Planned value (scheduled)',data:pvData,borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,0.08)',borderWidth:2,borderDash:[6,4],pointRadius:3,pointBackgroundColor:'#6366f1',fill:false,tension:0.3},
+          {label:'Earned value (completed)',data:evData,borderColor:'#059669',backgroundColor:'rgba(5,150,105,0.10)',borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#059669',fill:true,tension:0.3,spanGaps:false}
         ]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11},usePointStyle:true}},tooltip:{callbacks:{label:ctx=>' £'+ctx.parsed.y.toLocaleString('en-GB')}}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.05)'},ticks:{callback:v=>'£'+v.toLocaleString('en-GB')}},x:{grid:{display:false}}}}
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11},usePointStyle:true}},tooltip:{callbacks:{label:ctx=>' '+ctx.dataset.label+': £'+(ctx.parsed.y||0).toLocaleString('en-GB')}}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.05)'},ticks:{callback:v=>'£'+v.toLocaleString('en-GB')}},x:{grid:{display:false}}}}
       });
     }
   }
@@ -9570,6 +9593,53 @@ function renderKPIActions(){
       </div>`).join('')}
     </div>`;
   } else if(ov){ov.innerHTML='<div style="font-size:13px;color:var(--ink3)">Sign off installs to see overrun analysis.</div>';}
+}
+
+
+// ── SCHEDULED AHEAD (forward-looking pipeline of booked-in installs) ──
+function renderKPIScheduled(){
+  const body=gel('kpi-sched-body'), sum=gel('kpi-sched-summary'), sub=gel('kpi-sched-sub');
+  if(!body)return;
+  const today=new Date().toISOString().slice(0,10);
+  const in28=new Date(Date.now()+28*864e5).toISOString().slice(0,10);
+  const cv=j=>parseFloat(j.contractValue)||0;
+  const jobs=(JOBS||[]).filter(j=>j&&!j._archived&&j.start&&/^\d{4}-\d{2}-\d{2}/.test(j.start)&&j.start>=today)
+    .sort((a,b)=>a.start.localeCompare(b.start));
+  const totVal=jobs.reduce((a,j)=>a+cv(j),0);
+  const next4=jobs.filter(j=>j.start<=in28);
+  const next4Val=next4.reduce((a,j)=>a+cv(j),0);
+  if(sub)sub.textContent=jobs.length+' jobs booked in from '+new Date(today+'T12:00').toLocaleDateString('en-GB')+' onwards';
+  if(sum){
+    const cards=[
+      {l:'Booked ahead',v:jobs.length,s:'installs with a date set',c:'#1e40af'},
+      {l:'Value booked ahead',v:'£'+totVal.toLocaleString('en-GB'),s:'total contract value',c:'#059669'},
+      {l:'Next 4 weeks',v:next4.length,s:'£'+next4Val.toLocaleString('en-GB'),c:'#d97706'},
+    ];
+    sum.innerHTML=cards.map(k=>`<div style="background:var(--bg);border:1.5px solid var(--bdr);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:3px">${k.l}</div><div style="font-size:22px;font-weight:700;color:${k.c};font-family:var(--mo);line-height:1.1">${k.v}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">${k.s}</div></div>`).join('');
+  }
+  if(!jobs.length){ body.innerHTML='<div style="padding:20px;font-size:13px;color:var(--ink3);text-align:center">No jobs booked in ahead. Set an install start date on a job to see it here.</div>'; return; }
+  const byMonth={};
+  jobs.forEach(j=>{ const m=j.start.slice(0,7); (byMonth[m]=byMonth[m]||[]).push(j); });
+  const fmtSch=d=>d?new Date(d+'T12:00').toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short'}):'—';
+  let html='';
+  Object.keys(byMonth).sort().forEach(m=>{
+    const list=byMonth[m], mTot=list.reduce((a,j)=>a+cv(j),0);
+    const mLabel=new Date(m+'-15').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+    html+=`<div style="padding:8px 16px;background:var(--bg);border-top:1px solid var(--bdr);border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;font-weight:700;color:var(--ink)">${mLabel}</span><span style="font-size:12px;font-weight:700;font-family:var(--mo);color:var(--ink2)">${list.length} · £${mTot.toLocaleString('en-GB')}</span></div>`;
+    html+='<table style="width:100%;border-collapse:collapse;font-size:12px"><tbody>';
+    list.forEach(j=>{
+      html+=`<tr style="border-bottom:1px solid var(--bdr)">
+        <td style="padding:8px 16px;white-space:nowrap;font-size:11px;color:var(--ink3)">${fmtSch(j.start)}</td>
+        <td style="padding:8px 12px;font-family:var(--mo);font-weight:700;color:var(--grn)">${esc(j.ref||'—')}</td>
+        <td style="padding:8px 12px">${esc(j.name||'')}</td>
+        <td style="padding:8px 12px;color:var(--ink3);font-size:11px">${esc(j.type||'')}</td>
+        <td style="padding:8px 12px;font-size:11px;color:var(--ink3);white-space:nowrap">${j.scafUp?'Scaffold '+fmtSch(j.scafUp):''}</td>
+        <td style="padding:8px 16px;text-align:right;font-family:var(--mo);font-weight:700;white-space:nowrap">${cv(j)?'£'+cv(j).toLocaleString('en-GB'):'—'}</td>
+      </tr>`;
+    });
+    html+='</tbody></table>';
+  });
+  body.innerHTML=html;
 }
 
 
