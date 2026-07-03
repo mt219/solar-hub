@@ -1473,7 +1473,12 @@ select.ei{cursor:pointer}
     </div>
     <div class="card">
       <div class="card-head"><div class="ch-icon" style="background:#fef3c7">📊</div><div><div class="ch-title">Pipeline chart</div><div class="ch-sub">Contract value per month</div></div></div>
-      <div class="card-body"><div style="position:relative;height:260px"><canvas id="fin-chart" style="display:block"></canvas></div></div>
+      <div class="card-body"><div style="position:relative;height:260px"><canvas id="fin-chart" style="display:block"></canvas></div>
+        <div style="font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5">
+          <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#7c3aed;margin-right:5px;vertical-align:middle"></span>
+          <b>Earned value / month</b> = contract value of jobs <b>signed off</b> that month (not cumulative) — compare month vs month. Bars show pipeline contract value by status.
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1778,6 +1783,31 @@ Ref 12196 (Jenny Roe) done 16 May, Fox ESS, on time
       </div>
       <div class="card-body"><div id="kpi-sched-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:8px"></div></div>
       <div id="kpi-sched-body"></div>
+    </div>
+    <!-- Forecast: what's booked in ahead, by install month -->
+    <div class="card">
+      <div class="card-head"><div class="ch-icon" style="background:#dbeafe">📈</div><div><div class="ch-title">Booked-in ahead — by install month</div><div class="ch-sub">Future capacity already scheduled: installs, PV kWp, battery kWh and contract value per month</div></div></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px">
+          <div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#1e40af;margin-bottom:4px">Installs booked</div>
+            <div style="position:relative;height:200px"><canvas id="kpi-fc-installs" style="display:block"></canvas></div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#059669;margin-bottom:4px">PV booked (kWp)</div>
+            <div style="position:relative;height:200px"><canvas id="kpi-fc-kwp" style="display:block"></canvas></div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#7c3aed;margin-bottom:4px">Battery booked (kWh)</div>
+            <div style="position:relative;height:200px"><canvas id="kpi-fc-kwh" style="display:block"></canvas></div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#d97706;margin-bottom:4px">Contract value booked (£)</div>
+            <div style="position:relative;height:200px"><canvas id="kpi-fc-value" style="display:block"></canvas></div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--ink3);margin-top:10px;line-height:1.5">Each bar is what's already booked in for that month. So the battery kWh three months out tells you how much storage you've committed to install then — useful for ordering ahead. Only jobs with an install date set appear here.</div>
+      </div>
     </div>
   </div>
 
@@ -8714,6 +8744,21 @@ function finSyncFromJobs(){
   });
   try{ finJobsStoreLocal(); }catch(e){}
 }
+// Resolve the contract value for a finance row at render time. Uses the row's
+// own stored value if set, otherwise falls back to the live job's contract
+// value / Job Costing sale price by ref. This guarantees contract values show
+// in the pipeline even if the stored finance value is stale or was 0.
+function finRowIncome(r){
+  let v=parseFloat(r&&r.value)||0;
+  if(v>0) return v;
+  const ref=r&&r.ref;
+  if(ref){
+    const j=(typeof JOBS!=='undefined'?JOBS:[]).find(x=>x&&x.ref===ref);
+    if(j){ const cv=parseFloat(j.contractValue)||0; if(cv>0) return cv; }
+    try{ if(typeof JC!=='undefined'&&JC&&JC.jobs&&JC.jobs[ref]){ const s=parseFloat(JC.jobs[ref].sale)||0; if(s>0) return s; } }catch(e){}
+  }
+  return v;
+}
 function finLoadLocal(){ try{ FIN_ROWS=JSON.parse(localStorage.getItem('gguk_finance')||'[]'); }catch(e){ FIN_ROWS=[]; } }
 function finStoreLocal(){ try{ localStorage.setItem('gguk_finance',JSON.stringify(FIN_ROWS)); }catch(e){} }
 
@@ -8794,7 +8839,7 @@ function renderFJTable(){
   const statusCol={scheduled:'#d97706',completed:'#059669',rescheduled:'#1e40af','on-hold':'#6b7280',cancelled:'#dc2626'};
   const statusBg={scheduled:'#fef3c7',completed:'#d1fae5',rescheduled:'#dbeafe','on-hold':'#f3f4f6',cancelled:'#fee2e2'};
   if(!rows.length){tbl.innerHTML='<div style="padding:20px;font-size:13px;color:var(--ink3);text-align:center">No jobs yet — add one above.</div>';return;}
-  const total=rows.reduce((a,r)=>a+r.value,0);
+  const total=rows.reduce((a,r)=>a+finRowIncome(r),0);
   const sub=gel('fj-table-sub');if(sub)sub.textContent=rows.length+' jobs · £'+total.toLocaleString('en-GB')+(search?' (filtered)':'');
   tbl.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px">
     <thead><tr style="background:var(--bg)">
@@ -8807,7 +8852,7 @@ function renderFJTable(){
         <td style="padding:9px 12px;font-family:var(--mo);font-weight:700;color:var(--grn)">${r.ref}</td>
         <td style="padding:9px 12px">${r.name}</td>
         <td style="padding:9px 12px;color:var(--ink3);font-size:11px">${r.type}</td>
-        <td style="padding:9px 12px;font-family:var(--mo);font-weight:700">£${r.value.toLocaleString('en-GB')}</td>
+        <td style="padding:9px 12px;font-family:var(--mo);font-weight:700">£${finRowIncome(r).toLocaleString('en-GB')}</td>
         <td style="padding:9px 12px">${monthFmt}</td>
         <td style="padding:9px 12px"><span style="font-size:10px;padding:2px 8px;border-radius:999px;font-weight:700;background:${statusBg[r.status]||'#f3f4f6'};color:${statusCol[r.status]||'#374151'}">${r.status}</span></td>
         <td style="padding:9px 12px;color:var(--ink3);font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.notes}">${r.notes||'—'}</td>
@@ -8846,7 +8891,7 @@ function renderMonthly(){
   months.forEach((m,mi)=>{
     let jobs=FIN_JOBS.filter(r=>r.month===m);
     if(hideCancelled) jobs=jobs.filter(r=>r.status!=='cancelled');
-    const total=jobs.reduce((a,r)=>a+r.value,0);
+    const total=jobs.reduce((a,r)=>a+finRowIncome(r),0);
     const isNow=m===new Date().toISOString().slice(0,7);
     html+=`<div style="background:var(--card);border:1.5px solid ${isNow?'var(--grn)':'var(--bdr)'};border-radius:12px;overflow:hidden">
       <div style="padding:10px 14px;background:${isNow?'var(--grn-l)':'var(--bg)'};border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between">
@@ -8860,7 +8905,7 @@ function renderMonthly(){
         <span style="font-size:10px;padding:1px 6px;border-radius:999px;background:${statusBg[r.status]||'#f3f4f6'};color:${statusCol[r.status]||'#374151'};font-weight:700;white-space:nowrap">${r.status}</span>
         <span style="font-size:12px;font-weight:600;color:var(--grn);font-family:var(--mo)">${r.ref}</span>
         <span style="font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink2)">${r.name}</span>
-        <span style="font-size:11px;font-family:var(--mo);color:var(--ink3);white-space:nowrap">£${r.value.toLocaleString('en-GB')}</span>
+        <span style="font-size:11px;font-family:var(--mo);color:var(--ink3);white-space:nowrap">£${finRowIncome(r).toLocaleString('en-GB')}</span>
         <button onclick="fjReschedule(${FIN_JOBS.indexOf(r)})" title="Move job" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--ink3);padding:0 2px">↪</button>
       </div>`;
     });
@@ -8876,21 +8921,27 @@ function renderMonthly(){
     if(FIN_CHART_OBJ){try{FIN_CHART_OBJ.destroy();}catch(e){}}
     const ctx=canvas.getContext('2d');
     const todayYM=new Date().toISOString().slice(0,7);
-    let cumEV=0;
+    // Earned value per month = contract value of jobs actually SIGNED OFF with a
+    // completion date in that month (non-cumulative, so months compare directly).
+    // Pulled from the sign-off log and matched to each job's contract value.
     const evData=months.map(m=>{
-      const mJobs=FIN_JOBS.filter(r=>r.month===m&&(!hideCancelled||r.status!=='cancelled'));
-      cumEV+=mJobs.reduce((a,r)=>a+r.value,0);
-      return Math.round(cumEV);
+      let sum=0;
+      (typeof SO_LOG!=='undefined'?SO_LOG:[]).forEach(so=>{
+        if(!so||!so.date||String(so.date).slice(0,7)!==m) return;
+        const j=(typeof JOBS!=='undefined'?JOBS:[]).find(x=>x&&x.ref===so.ref);
+        if(j) sum+=parseFloat(j.contractValue)||0;
+      });
+      return Math.round(sum);
     });
     const _goals=(typeof loadKPIGoals==='function')?loadKPIGoals():{weeklyInstalls:5};
     const monthlyTarget=Math.max(1,Math.round((_goals.weeklyInstalls||5)*52/12));
     FIN_CHART_OBJ=new Chart(ctx,{
       type:'bar',
       data:{labels:monthNames,datasets:[
-        {label:'Completed',data:months.map(m=>FIN_JOBS.filter(r=>r.month===m&&r.status==='completed').reduce((a,r)=>a+r.value,0)),backgroundColor:'#059669',borderRadius:3,stack:'s1',order:2},
-        {label:'Scheduled',data:months.map(m=>FIN_JOBS.filter(r=>r.month===m&&r.status==='scheduled').reduce((a,r)=>a+r.value,0)),backgroundColor:'#d97706',borderRadius:3,stack:'s1',order:2},
-        {label:'Rescheduled',data:months.map(m=>FIN_JOBS.filter(r=>r.month===m&&r.status==='rescheduled').reduce((a,r)=>a+r.value,0)),backgroundColor:'#1e40af',borderRadius:3,stack:'s1',order:2},
-        {label:'Earned value (cumulative)',data:evData,type:'line',borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,0.08)',borderWidth:2.5,pointRadius:3,pointBackgroundColor:'#7c3aed',fill:false,tension:0.3,yAxisID:'yEV',order:1},
+        {label:'Completed',data:months.map(m=>FIN_JOBS.filter(r=>r.month===m&&r.status==='completed').reduce((a,r)=>a+finRowIncome(r),0)),backgroundColor:'#059669',borderRadius:3,stack:'s1',order:2},
+        {label:'Scheduled',data:months.map(m=>FIN_JOBS.filter(r=>r.month===m&&r.status==='scheduled').reduce((a,r)=>a+finRowIncome(r),0)),backgroundColor:'#d97706',borderRadius:3,stack:'s1',order:2},
+        {label:'Rescheduled',data:months.map(m=>FIN_JOBS.filter(r=>r.month===m&&r.status==='rescheduled').reduce((a,r)=>a+finRowIncome(r),0)),backgroundColor:'#1e40af',borderRadius:3,stack:'s1',order:2},
+        {label:'Earned value / month (signed-off)',data:evData,type:'line',borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,0.08)',borderWidth:2.5,pointRadius:3,pointBackgroundColor:'#7c3aed',fill:false,tension:0.3,yAxisID:'yEV',order:1},
         {label:'Installs (count)',data:months.map(m=>FIN_JOBS.filter(r=>r.month===m&&(!hideCancelled||r.status!=='cancelled')).length),type:'line',borderColor:'#0ea5e9',backgroundColor:'rgba(14,165,233,0.10)',borderWidth:2,pointRadius:3,pointBackgroundColor:'#0ea5e9',fill:false,tension:0.3,yAxisID:'yCount',order:0},
         {label:'Install target / mo',data:months.map(()=>monthlyTarget),type:'line',borderColor:'#6366f1',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false,yAxisID:'yCount',order:0},
       ]},
@@ -8900,7 +8951,7 @@ function renderMonthly(){
         scales:{
           x:{stacked:true,grid:{display:false}},
           y:{stacked:true,beginAtZero:true,grid:{color:'rgba(0,0,0,0.05)'},ticks:{callback:v=>'£'+v.toLocaleString('en-GB')}},
-          yEV:{position:'right',beginAtZero:true,grid:{display:false},ticks:{callback:v=>'£'+v.toLocaleString('en-GB')},title:{display:true,text:'Cumulative EV',font:{size:10},color:'#7c3aed'}},yCount:{position:'right',beginAtZero:true,grid:{display:false},ticks:{stepSize:1,callback:v=>Number.isInteger(v)?v:''},title:{display:true,text:'Installs',font:{size:10},color:'#0ea5e9'}}
+          yEV:{position:'right',beginAtZero:true,grid:{display:false},ticks:{callback:v=>'£'+v.toLocaleString('en-GB')},title:{display:true,text:'Earned value / mo',font:{size:10},color:'#7c3aed'}},yCount:{position:'right',beginAtZero:true,grid:{display:false},ticks:{stepSize:1,callback:v=>Number.isInteger(v)?v:''},title:{display:true,text:'Installs',font:{size:10},color:'#0ea5e9'}}
         }
       }
     });
@@ -9034,8 +9085,8 @@ function renderFinSummary(){
   // Payment timing assumes every stage payment is received on its due date —
   // so anything due on or before today is treated as received, nothing is overdue.
   const today=new Date().toISOString().slice(0,10);
-  const scheduled=FIN_JOBS.filter(r=>r.status==='scheduled').reduce((a,r)=>a+r.value,0);
-  const completed=FIN_JOBS.filter(r=>r.status==='completed').reduce((a,r)=>a+r.value,0);
+  const scheduled=FIN_JOBS.filter(r=>r.status==='scheduled').reduce((a,r)=>a+finRowIncome(r),0);
+  const completed=FIN_JOBS.filter(r=>r.status==='completed').reduce((a,r)=>a+finRowIncome(r),0);
   // Received-to-date vs upcoming, from the auto payment schedule (deposit excluded)
   let receivedToDate=0, upcoming=0;
   JOBS.filter(j=>!j._archived).forEach(j=>{
@@ -9118,7 +9169,7 @@ async function draftFinanceEmail(){
   const rows=schedRows.join('\n')||'No scheduled milestones.';
   const thisMonth=new Date().toISOString().slice(0,7);
   const monthJobs=FIN_JOBS.filter(r=>r.month===thisMonth);
-  const monthSummary=monthJobs.length?monthJobs.map(r=>`${r.ref} ${r.name} £${r.value.toLocaleString('en-GB')} (${r.status})`).join(', '):'No jobs this month';
+  const monthSummary=monthJobs.length?monthJobs.map(r=>`${r.ref} ${r.name} £${finRowIncome(r).toLocaleString('en-GB')} (${r.status})`).join(', '):'No jobs this month';
   const todayFmt=new Date().toLocaleDateString('en-GB');
   try{
     const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -9204,6 +9255,20 @@ async function soSave(){
   };
   if(!row.ref&&!row.name){alert('Please enter a job ref or customer name.');return;}
   if(!row.date){alert('Please enter the completion date.');return;}
+  // Only jobs that actually exist in the Solar Hub app can be signed off.
+  // Match on ref first (exact, case-insensitive), else on name. Blocks stray
+  // sign-offs and normalises ref/name to the app record so earned value (EVM)
+  // and finance figures link up correctly.
+  const jobMatch=(typeof JOBS!=='undefined'?JOBS:[]).find(j=>j&&!j._archived&&(
+    (row.ref&&(j.ref||'').trim().toLowerCase()===row.ref.toLowerCase())||
+    (!row.ref&&row.name&&(j.name||'').trim().toLowerCase()===row.name.toLowerCase())
+  ));
+  if(!jobMatch){
+    alert('That job isn\u2019t in the Solar Hub app, so it can\u2019t be signed off.\n\nUse the search box above to find and select the job, then sign it off. If it should be here, add it on the Job details tab first.');
+    return;
+  }
+  row.ref=jobMatch.ref||row.ref;
+  if(!row.name) row.name=jobMatch.name||'';
   SO_LOG.unshift(row);
   soStoreLocal();
   await sbUpsertSO(row);
@@ -9261,15 +9326,28 @@ async function parsePasteList(){
     const clean=raw.replace(/```json|```/g,'').trim();
     const jobs=JSON.parse(clean);
     if(!Array.isArray(jobs)||!jobs.length){out.innerHTML='No jobs found in that text.';return;}
+    const norm=s=>String(s||'').trim().toLowerCase();
+    const findJob=j=>(typeof JOBS!=='undefined'?JOBS:[]).find(x=>x&&!x._archived&&(
+      (j.ref&&norm(x.ref)===norm(j.ref))||
+      (!j.ref&&j.name&&norm(x.name)===norm(j.name))
+    ));
+    const added=[], skipped=[];
     for(const j of jobs){
-      const row={...j,id:Date.now()+Math.random()};
+      const match=findJob(j);
+      if(!match){ skipped.push(j); continue; }   // only sign off jobs that exist in the app
+      const row={...j,ref:match.ref||j.ref||'',name:j.name||match.name||'',id:Date.now()+Math.random()};
       SO_LOG.unshift(row);
       await sbUpsertSO(row);
+      added.push(row);
     }
     soStoreLocal();
     renderSOTable();renderKPIMetrics();
-    out.innerHTML=`✅ Added <strong>${jobs.length} installs</strong> to sign-off log:<br>${jobs.map(j=>`• ${j.ref||'?'} ${j.name} — ${j.date}`).join('<br>')}`;
-    const pi=gel('paste-input');if(pi)pi.value='';
+    let msg='';
+    if(added.length){ msg+=`✅ Added <strong>${added.length} install${added.length===1?'':'s'}</strong> to sign-off log:<br>${added.map(j=>`• ${j.ref||'?'} ${j.name} — ${j.date}`).join('<br>')}`; }
+    else { msg+='No matching jobs were added.'; }
+    if(skipped.length){ msg+=`<br><br>⚠️ <strong>${skipped.length} skipped</strong> — not found in the Solar Hub app (add them on the Job details tab first, then re-paste):<br>${skipped.map(j=>`• ${j.ref||'?'} ${j.name||''}`).join('<br>')}`; }
+    out.innerHTML=msg;
+    const pi=gel('paste-input');if(pi&&added.length)pi.value='';
   }catch(e){out.innerHTML='Error: '+e.message;}
 }
 
@@ -9287,7 +9365,7 @@ function renderKPIMetrics(){
   const scheduledThisMonth=thisMonthJobs.length;
   // Annual revenue progress from payment schedule
   const thisYear=now.getFullYear()+'';
-  const annualEV=FIN_JOBS.filter(r=>r.month&&r.month.startsWith(thisYear)).reduce((s,r)=>s+(parseFloat(r.value)||0),0);
+  const annualEV=FIN_JOBS.filter(r=>r.month&&r.month.startsWith(thisYear)).reduce((s,r)=>s+finRowIncome(r),0);
   const annualTarget=goals.annualRevenue||0;
   const annualPct=annualTarget>0?Math.min(100,Math.round(annualEV/annualTarget*100)):null;
   // Forward-looking: jobs with an install date from today onwards
@@ -9397,6 +9475,7 @@ function closeKPIGoals(){
 // Targets stored per metric per week as {metric, weekIdx, value}
 // metrics: installs, kwp, kwh, ev
 let KPI_CHART_INSTALLS=null, KPI_CHART_KWP=null, KPI_CHART_KWH=null, KPI_CHART_EARNED=null, KPI_CHART_EV=null;
+let KPI_FCAST_CHARTS={};
 let KPI_DRAG_TARGETS = null; // loaded lazily
 
 function loadDragTargets(){
@@ -9602,21 +9681,32 @@ function renderKPIScheduled(){
   if(!body)return;
   const today=new Date().toISOString().slice(0,10);
   const in28=new Date(Date.now()+28*864e5).toISOString().slice(0,10);
+  const in90=new Date(Date.now()+90*864e5).toISOString().slice(0,10);
   const cv=j=>parseFloat(j.contractValue)||0;
+  const kwp=j=>(j.panels||[]).reduce((a,p)=>a+((parseFloat(p.wp)||0)*(parseInt(p.qty)||0)/1000),0);
+  const kwh=j=>(j.batteries||[]).reduce((a,b)=>a+(parseFloat(b.kwh)||0),0);
   const jobs=(JOBS||[]).filter(j=>j&&!j._archived&&j.start&&/^\d{4}-\d{2}-\d{2}/.test(j.start)&&j.start>=today)
     .sort((a,b)=>a.start.localeCompare(b.start));
   const totVal=jobs.reduce((a,j)=>a+cv(j),0);
+  const totKwp=jobs.reduce((a,j)=>a+kwp(j),0);
+  const totKwh=jobs.reduce((a,j)=>a+kwh(j),0);
   const next4=jobs.filter(j=>j.start<=in28);
   const next4Val=next4.reduce((a,j)=>a+cv(j),0);
+  const next90=jobs.filter(j=>j.start<=in90);
+  const n90Kwh=next90.reduce((a,j)=>a+kwh(j),0), n90Kwp=next90.reduce((a,j)=>a+kwp(j),0);
   if(sub)sub.textContent=jobs.length+' jobs booked in from '+new Date(today+'T12:00').toLocaleDateString('en-GB')+' onwards';
   if(sum){
     const cards=[
       {l:'Booked ahead',v:jobs.length,s:'installs with a date set',c:'#1e40af'},
-      {l:'Value booked ahead',v:'£'+totVal.toLocaleString('en-GB'),s:'total contract value',c:'#059669'},
-      {l:'Next 4 weeks',v:next4.length,s:'£'+next4Val.toLocaleString('en-GB'),c:'#d97706'},
+      {l:'PV booked ahead',v:totKwp.toFixed(1)+' kWp',s:'total roof PV to fit',c:'#059669'},
+      {l:'Battery booked ahead',v:totKwh.toFixed(1)+' kWh',s:'total storage to fit',c:'#7c3aed'},
+      {l:'Value booked ahead',v:'£'+totVal.toLocaleString('en-GB'),s:'total contract value',c:'#d97706'},
+      {l:'Next 90 days',v:next90.length+' installs',s:n90Kwp.toFixed(0)+' kWp · '+n90Kwh.toFixed(0)+' kWh',c:'#0ea5e9'},
     ];
-    sum.innerHTML=cards.map(k=>`<div style="background:var(--bg);border:1.5px solid var(--bdr);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:3px">${k.l}</div><div style="font-size:22px;font-weight:700;color:${k.c};font-family:var(--mo);line-height:1.1">${k.v}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">${k.s}</div></div>`).join('');
+    sum.innerHTML=cards.map(k=>`<div style="background:var(--bg);border:1.5px solid var(--bdr);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:3px">${k.l}</div><div style="font-size:20px;font-weight:700;color:${k.c};font-family:var(--mo);line-height:1.1">${k.v}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">${k.s}</div></div>`).join('');
   }
+  // Forecast charts by install month
+  drawKPIForecast(jobs,{cv,kwp,kwh});
   if(!jobs.length){ body.innerHTML='<div style="padding:20px;font-size:13px;color:var(--ink3);text-align:center">No jobs booked in ahead. Set an install start date on a job to see it here.</div>'; return; }
   const byMonth={};
   jobs.forEach(j=>{ const m=j.start.slice(0,7); (byMonth[m]=byMonth[m]||[]).push(j); });
@@ -9633,13 +9723,51 @@ function renderKPIScheduled(){
         <td style="padding:8px 12px;font-family:var(--mo);font-weight:700;color:var(--grn)">${esc(j.ref||'—')}</td>
         <td style="padding:8px 12px">${esc(j.name||'')}</td>
         <td style="padding:8px 12px;color:var(--ink3);font-size:11px">${esc(j.type||'')}</td>
-        <td style="padding:8px 12px;font-size:11px;color:var(--ink3);white-space:nowrap">${j.scafUp?'Scaffold '+fmtSch(j.scafUp):''}</td>
+        <td style="padding:8px 12px;font-size:11px;color:var(--ink3);white-space:nowrap">${kwp(j)?kwp(j).toFixed(1)+'kWp':''}${kwh(j)?' · '+kwh(j).toFixed(1)+'kWh':''}</td>
         <td style="padding:8px 16px;text-align:right;font-family:var(--mo);font-weight:700;white-space:nowrap">${cv(j)?'£'+cv(j).toLocaleString('en-GB'):'—'}</td>
       </tr>`;
     });
     html+='</tbody></table>';
   });
   body.innerHTML=html;
+}
+
+// Draw the four forward-looking "booked ahead by month" bar charts.
+function drawKPIForecast(jobs,f){
+  const ids=['kpi-fc-installs','kpi-fc-kwp','kpi-fc-kwh','kpi-fc-value'];
+  const draw=()=>{
+    if(typeof Chart==='undefined')return;
+    // Build a contiguous run of months from this month to the furthest booked
+    // month, with a minimum horizon of 6 months so "3 months time" is visible.
+    const now=new Date(); const startY=now.getFullYear(), startM=now.getMonth();
+    let maxIdx=5;
+    jobs.forEach(j=>{ const d=new Date(j.start+'T12:00'); const idx=(d.getFullYear()-startY)*12+(d.getMonth()-startM); if(idx>maxIdx) maxIdx=idx; });
+    maxIdx=Math.min(maxIdx,17); // cap horizon at 18 months
+    const months=[], labels=[];
+    for(let i=0;i<=maxIdx;i++){ const d=new Date(startY,startM+i,1); months.push(d.toISOString().slice(0,7)); labels.push(d.toLocaleDateString('en-GB',{month:'short',year:'2-digit'})); }
+    const inMonth=m=>jobs.filter(j=>j.start.slice(0,7)===m);
+    const series={
+      'kpi-fc-installs':{data:months.map(m=>inMonth(m).length),color:'#1e40af',money:false},
+      'kpi-fc-kwp':{data:months.map(m=>Math.round(inMonth(m).reduce((a,j)=>a+f.kwp(j),0)*10)/10),color:'#059669',money:false},
+      'kpi-fc-kwh':{data:months.map(m=>Math.round(inMonth(m).reduce((a,j)=>a+f.kwh(j),0)*10)/10),color:'#7c3aed',money:false},
+      'kpi-fc-value':{data:months.map(m=>Math.round(inMonth(m).reduce((a,j)=>a+f.cv(j),0))),color:'#d97706',money:true},
+    };
+    ids.forEach(id=>{
+      const cv=gel(id); if(!cv)return;
+      if(KPI_FCAST_CHARTS[id]){try{KPI_FCAST_CHARTS[id].destroy();}catch(e){}}
+      const s=series[id];
+      KPI_FCAST_CHARTS[id]=new Chart(cv.getContext('2d'),{
+        type:'bar',
+        data:{labels,datasets:[{data:s.data,backgroundColor:s.color,borderRadius:4,maxBarThickness:38}]},
+        options:{responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>s.money?(' £'+(ctx.parsed.y||0).toLocaleString('en-GB')):(' '+(ctx.parsed.y||0))}}},
+          scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:10},callback:v=>s.money?('£'+(v>=1000?(v/1000)+'k':v)):v}}}
+        }
+      });
+    });
+  };
+  if(typeof Chart!=='undefined'){draw();}
+  else{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js';sc.onload=draw;document.head.appendChild(sc);}
 }
 
 
