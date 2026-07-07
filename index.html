@@ -1459,7 +1459,7 @@ select.ei{cursor:pointer}
   <!-- TAB: MONTHLY PIPELINE -->
   <div id="fin-pane-monthly" style="display:none">
     <div class="card">
-      <div class="card-head"><div class="ch-icon" style="background:#dbeafe">📅</div><div><div class="ch-title">Monthly install pipeline</div><div class="ch-sub">Contract value by install month · all job statuses</div></div></div>
+      <div class="card-head"><div class="ch-icon" style="background:#dbeafe">📅</div><div><div class="ch-title">Monthly install pipeline</div><div class="ch-sub">Order value by install month · cash due by milestone date · all job statuses</div></div></div>
       <div class="card-body">
         <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
           <select class="inp" id="fin-year-select" style="width:120px;padding:6px 10px;font-size:12px" onchange="renderMonthly()">
@@ -8887,16 +8887,54 @@ function renderMonthly(){
   const statusBg={scheduled:'#fef3c7',completed:'#d1fae5',rescheduled:'#dbeafe','on-hold':'#f3f4f6',cancelled:'#fee2e2'};
   const statusCol={scheduled:'#92400e',completed:'#065f46',rescheduled:'#1e3a5f','on-hold':'#374151',cancelled:'#991b1b'};
 
+  // ── Payment milestone cash by calendar month (dated milestone receipts) ──
+  // Distinct from the header ORDER VALUE figure. Order value is tied to a job's
+  // INSTALL month; milestone cash is tied to each milestone's OWN due date — so a
+  // June install contributes its 50% advance to (typically) May and its 5%
+  // commissioning to a later month. Deposits (10%) excluded — received before the
+  // job enters the app. Archived and (when hidden) cancelled jobs are skipped.
+  const gbp0=n=>'£'+Math.round(n).toLocaleString('en-GB');
+  const cancelledRefs=new Set(FIN_JOBS.filter(r=>r.status==='cancelled').map(r=>r.ref));
+  const msByMonth={};
+  (typeof JOBS!=='undefined'?JOBS:[]).forEach(j=>{
+    if(!j||j._archived) return;
+    if(hideCancelled && cancelledRefs.has(j.ref)) return;
+    const {cv, milestones}=jobPaymentSchedule(j);
+    if(!cv) return;
+    milestones.forEach(mm=>{
+      if(mm.pct===10 || !mm.date || mm.date==='—') return;
+      const mk=String(mm.date).slice(0,7);
+      if(!msByMonth[mk]) msByMonth[mk]={adv:0,inst:0,comm:0,total:0};
+      const amt=cv*(mm.pct/100);
+      if(mm.pct===50) msByMonth[mk].adv+=amt;
+      else if(mm.pct===35) msByMonth[mk].inst+=amt;
+      else if(mm.pct===5) msByMonth[mk].comm+=amt;
+      msByMonth[mk].total+=amt;
+    });
+  });
+
   let html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">';
   months.forEach((m,mi)=>{
     let jobs=FIN_JOBS.filter(r=>r.month===m);
     if(hideCancelled) jobs=jobs.filter(r=>r.status!=='cancelled');
     const total=jobs.reduce((a,r)=>a+finRowIncome(r),0);
+    const ms=msByMonth[m]||{adv:0,inst:0,comm:0,total:0};
+    const chip=(lbl,val,bg,fg)=> val>0?`<span style="font-size:10px;padding:1px 6px;border-radius:999px;background:${bg};color:${fg};font-weight:700;white-space:nowrap">${lbl} ${gbp0(val)}</span>`:'';
     const isNow=m===new Date().toISOString().slice(0,7);
     html+=`<div style="background:var(--card);border:1.5px solid ${isNow?'var(--grn)':'var(--bdr)'};border-radius:12px;overflow:hidden">
       <div style="padding:10px 14px;background:${isNow?'var(--grn-l)':'var(--bg)'};border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between">
         <span style="font-size:13px;font-weight:700;color:${isNow?'var(--grn)':'var(--ink)'}">${monthNames[mi]} ${selYear}</span>
-        <span style="font-size:12px;font-weight:700;font-family:var(--mo);color:${isNow?'var(--grn)':'var(--ink2)'}">£${total.toLocaleString('en-GB')}</span>
+        <span style="display:flex;flex-direction:column;align-items:flex-end;line-height:1.15">
+          <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink3)">Order value</span>
+          <span style="font-size:12px;font-weight:700;font-family:var(--mo);color:${isNow?'var(--grn)':'var(--ink2)'}">£${total.toLocaleString('en-GB')}</span>
+        </span>
+      </div>
+      <div style="padding:6px 14px;background:${isNow?'var(--grn-l)':'var(--bg)'};border-bottom:1px solid var(--bdr);display:flex;flex-wrap:wrap;align-items:center;gap:5px">
+        <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink3)">Cash due</span>
+        <span style="font-size:12px;font-weight:800;font-family:var(--mo);color:${ms.total>0?'var(--ink)':'var(--ink3)'}">${gbp0(ms.total)}</span>
+        ${chip('50%',ms.adv,'#dbeafe','#1d4ed8')}
+        ${chip('35%',ms.inst,'#d1fae5','#059669')}
+        ${chip('5%',ms.comm,'#ede9fe','#7c3aed')}
       </div>
       <div style="padding:8px">`;
     if(!jobs.length){html+='<div style="font-size:11px;color:var(--ink3);padding:6px 4px;font-style:italic">No jobs</div>';}
