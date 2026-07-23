@@ -2188,8 +2188,19 @@ async function gdPull() {
       JOBS=merged;
       try{localStorage.setItem('gguk_v9_jobs',JSON.stringify(JOBS));}catch(e){}
       refreshSaved();
+      let scaffMsg='';
+      if(Array.isArray(cloud.scaffContacts)&&cloud.scaffContacts.length){
+        const smerged=[...cloud.scaffContacts];
+        (typeof SCAFF_CONTACTS!=='undefined'?SCAFF_CONTACTS:[]).forEach(function(lc){
+          if(!smerged.find(function(cc){return cc.id===lc.id||((cc.email||'').toLowerCase()&&cc.email.toLowerCase()===(lc.email||'').toLowerCase());}))smerged.push(lc);
+        });
+        SCAFF_CONTACTS=smerged;
+        try{localStorage.setItem('gguk_scaff',JSON.stringify(SCAFF_CONTACTS));}catch(e){}
+        if(typeof renderScaffContacts==='function')renderScaffContacts();
+        scaffMsg=' · '+SCAFF_CONTACTS.length+' scaffold co'+(SCAFF_CONTACTS.length!==1?'s':'');
+      }
       const n=merged.length;
-      gdStatus('✔ Synced '+n+' job'+(n!==1?'s':'')+' · '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
+      gdStatus('✔ Synced '+n+' job'+(n!==1?'s':'')+scaffMsg+' · '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
     }
   }catch(e){gdStatus('Pull failed: '+e.message,true);}
 }
@@ -2199,7 +2210,7 @@ async function gdPush() {
   gdStatus('Saving to Drive…');
   try{
     let fid=GD_FILE_ID||await gdFindFile();
-    const body=JSON.stringify({jobs:JOBS,updated:new Date().toISOString()});
+    const body=JSON.stringify({jobs:JOBS,scaffContacts:(typeof SCAFF_CONTACTS!=='undefined'?SCAFF_CONTACTS:[]),updated:new Date().toISOString()});
     let r;
     if(fid){
       r=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+fid+'?uploadType=media',
@@ -2326,11 +2337,13 @@ function saveScaffModal(editIdx) {
   saveScaffContacts(); saveScaffQuotes(); renderScaffContacts();
   loadScaffQuotes(); renderScaffQuotes();
   document.getElementById('scaff-modal').style.display='none';
+  if(typeof gdPush==='function') gdPush();
 }
 
 function removeScaffContact(i){
   if(!confirm('Remove '+SCAFF_CONTACTS[i]?.name+'?')) return;
   SCAFF_CONTACTS.splice(i,1); saveScaffContacts(); renderScaffContacts();
+  if(typeof gdPush==='function') gdPush();
 }
 
 // Auto-select scaffold contacts based on job address proximity
@@ -2770,8 +2783,8 @@ function renderBats() {
   if(!J.batteries.length){el.innerHTML='<div style="font-size:13px;color:var(--ink3);padding:8px 0">No batteries added — click + Add above.</div>';return;}
   el.innerHTML=J.batteries.map((b,i)=>{
     // Auto-resolve ENA ref from DB, falling back to stored manual ref
-    const autoRef = enaRefLookup(b.brand, b.model, J.enaRefs);
-    const isResolved = enaRefIsResolved(b.brand, b.model, J.enaRefs);
+    const autoRef = enaRefLookup(b.brand, b.model, J.enaRefs, b.kwh);
+    const isResolved = enaRefIsResolved(b.brand, b.model, J.enaRefs, b.kwh);
     const manKey = (b.brand||'').toLowerCase().trim()+'|'+(b.model||'').toLowerCase().trim();
     const manRef = (J.enaRefs && J.enaRefs[manKey]) ? J.enaRefs[manKey] : '';
     const refPlaceholder = isResolved ? autoRef : 'MCS/ENA Ref No.';
@@ -3313,9 +3326,18 @@ function updateDSBadge() {
 // WARRANTY LIBRARY
 // ════════════════════════════════════════════════════════════
 let WARRANTY_LIB = [];
-let SCAFF_CONTACTS = [{"id":1,"name":"(CRN)Stobbs","email":"","phone":"","region":"CRN","radius":999,"notes":""},{"id":2,"name":"(national)KC Scaffolding","email":"","phone":"","region":"National","radius":999,"notes":""},{"id":3,"name":"(National)JME","email":"","phone":"","region":"National","radius":999,"notes":""},{"id":4,"name":"(CRN)Rule Brothers","email":"","phone":"","region":"CRN","radius":999,"notes":""},{"id":5,"name":"(CRN) M&M Scaffolding","email":"","phone":"","region":"CRN","radius":999,"notes":""},{"id":6,"name":"(DVN) PSB","email":"","phone":"","region":"DVN","radius":999,"notes":""},{"id":7,"name":"(DVN) Avocet","email":"","phone":"","region":"DVN","radius":999,"notes":""},{"id":8,"name":"(DVN) Innate","email":"","phone":"","region":"DVN","radius":999,"notes":""},{"id":9,"name":"(DVN) Weller","email":"","phone":"","region":"DVN","radius":999,"notes":""},{"id":10,"name":"(DVN) BDD Scaffolding","email":"","phone":"","region":"DVN","radius":999,"notes":""},{"id":11,"name":"(DVN)Brace scaffolding","email":"","phone":"","region":"DVN","radius":999,"notes":""},{"id":12,"name":"Safeways scaffolding","email":"","phone":"","region":"National","radius":999,"notes":""},{"id":13,"name":"Straight up scaffolding","email":"","phone":"","region":"National","radius":999,"notes":""},{"id":14,"name":"Gravity scaffolding","email":"","phone":"","region":"National","radius":999,"notes":""},{"id":15,"name":"Olympia Scaffolding","email":"","phone":"","region":"National","radius":999,"notes":""}];
+let SCAFF_CONTACTS = [{"id":1,"name":"(CRN)Stobbs","email":"","phone":"","region":"CRN","radius":999,"notes":""},{"id":2,"name":"(national)KC Scaffolding","email":"","phone":"","region":"National","radius":999,"notes":""},{"id":3,"name":"(National)JME","email":"","phone":"","region":"National","radius":999,"notes":""},{"id":4,"name":"(CRN)Rule Brothers","email":"","phone":"","region":"CRN","radius":999,"notes":""},{"id":5,"name":"(CRN) M&M Scaffolding","email":"","phone":"","region":"CRN","radius":999,"notes":""},{"id":6,"name":"(DVN) PSB","email":"","phone":"","region":"DVN","radius":999,"notes":""},{"id":7,"name":"(DVN) Avocet","email":"","phone":"","region":"DVN","radius":999,"notes":""},{"id":8,"name":"(DVN) Innate","email":"","phone":"","region":"DVN","radius":999,"notes":""},{"id":9,"name":"(DVN) Weller","email":"","phone":"","region":"DVN","radius":999,"notes":""},{"id":10,"name":"(DVN) BDD Scaffolding","email":"","phone":"","region":"DVN","radius":999,"notes":""},{"id":11,"name":"(DVN)Brace scaffolding","email":"","phone":"","region":"DVN","radius":999,"notes":""},{"id":12,"name":"Safeways scaffolding","email":"","phone":"","region":"National","radius":999,"notes":""},{"id":13,"name":"Straight up scaffolding","email":"","phone":"","region":"National","radius":999,"notes":""},{"id":14,"name":"Gravity scaffolding","email":"","phone":"","region":"National","radius":999,"notes":""},{"id":15,"name":"Olympia Scaffolding","email":"","phone":"","region":"National","radius":999,"notes":""},{"id":16,"name":"Tubix Scaffolding","email":"aiden@tubix.co.uk","phone":"","region":"CRN","radius":150,"notes":"Based in Camborne \u2014 covers up to 150 miles"}];
 // Merge with locally saved contacts
 try{ var _sc=localStorage.getItem('gguk_scaff'); if(_sc){ var _scp=JSON.parse(_sc); if(_scp.length) SCAFF_CONTACTS=_scp; } }catch(e){}
+// One-time, idempotent: ensure Tubix Scaffolding is present even for browsers whose
+// saved scaffold list predates it (runs once per load, safe to leave in permanently)
+try{
+  if(!SCAFF_CONTACTS.some(function(c){return (c.email||'').toLowerCase()==='aiden@tubix.co.uk' || /tubix/i.test(c.name||'');})){
+    var _maxId=SCAFF_CONTACTS.reduce(function(m,c){return Math.max(m,parseInt(c.id)||0);},0);
+    SCAFF_CONTACTS.push({id:_maxId+1,name:"Tubix Scaffolding",email:"aiden@tubix.co.uk",phone:"",region:"CRN",radius:150,notes:"Based in Camborne \u2014 covers up to 150 miles"});
+    try{localStorage.setItem('gguk_scaff',JSON.stringify(SCAFF_CONTACTS));}catch(e){}
+  }
+}catch(e){}
 function loadScaffContacts(){try{const d=localStorage.getItem('gguk_scaff');if(d)SCAFF_CONTACTS=JSON.parse(d);}catch(e){}}
 function saveScaffContacts(){try{localStorage.setItem('gguk_scaff',JSON.stringify(SCAFF_CONTACTS));}catch(e){}}
 
@@ -4692,134 +4714,144 @@ function htmlWorkmanshipWarranty(j) {
 // Manufacturers Ref No. as registered on the ENA/MCS product list.
 // Key format: "brand|model_fragment" (lowercase, trimmed).
 // Falls back to brand + model string if no match found.
-const ENA_PRODUCT_DB = {
-  // Fox ESS inverters
-  'fox ess|h1-3.7':       'Fox ESS H1-3.7-E',
-  'fox ess|h1 3.7':       'Fox ESS H1-3.7-E',
-  'fox ess|h1-5':         'Fox ESS H1-5.0-E',
-  'fox ess|h1 5':         'Fox ESS H1-5.0-E',
-  'fox ess|gen 2 hybrid': 'Fox ESS H2-5.0-E',
-  'fox ess|h2-5':         'Fox ESS H2-5.0-E',
-  'fox ess|h1-6':         'Fox ESS H1-6.0-E',
-  'fox ess|h3-12':        'Fox ESS H3-12.0-E',
-  'fox ess|h3 12':        'Fox ESS H3-12.0-E',
-  'fox ess|h3-10':        'Fox ESS H3-10.0-E',
-  'fox ess|5kw hybrid':   'Fox ESS H1-5.0-E',
-  // Fox ESS batteries
-  'fox ess|ep6':          'Fox ESS ECS2900-H1',
-  'fox ess|ep12':         'Fox ESS ECS5800-H1',
-  'fox ess|ep12 plus':    'Fox ESS ECS5800-H1 Plus',
-  'fox ess|ep18':         'Fox ESS ECS8700-H1',
-  // GivEnergy inverters
-  'givenergy|2.0kw':      'GivEnergy GIV-HY2.0',
-  'givenergy|3.0kw':      'GivEnergy GIV-HY3.0',
-  'givenergy|3.6kw':      'GivEnergy GIV-HY3.6',
-  'givenergy|5.0kw':      'GivEnergy GIV-HY5.0',
-  'givenergy|6.0kw':      'GivEnergy GIV-HY6.0',
-  'givenergy|8.0kw':      'GivEnergy GIV-HY8.0',
-  'givenergy|10.0kw':     'GivEnergy GIV-HY10.0',
-  // GivEnergy batteries
-  'givenergy|2.6kwh':     'GivEnergy GIV-BAT2.6',
-  'givenergy|5.2kwh':     'GivEnergy GIV-BAT5.2',
-  'givenergy|9.5kwh':     'GivEnergy GIV-BAT9.5',
-  // Solis inverters
-  'solis|3kw':            'Solis-1P3K-4G-Plus',
-  'solis|3.6kw':          'Solis-1P3.6K-4G-Plus',
-  'solis|4kw':            'Solis-1P4K-4G-Plus',
-  'solis|5kw':            'Solis-1P5K-4G-Plus',
-  'solis|6kw':            'Solis-1P6K-4G-Plus',
-  'solis|s6-gr1p3k':      'Solis-S6-GR1P3K',
-  'solis|s6-gr1p3.6k':    'Solis-S6-GR1P3.6K',
-  'solis|s6-gr1p5k':      'Solis-S6-GR1P5K',
-  'solis|rhi-3p':         'Solis-RHI-3P(5-15)K-HVES-5G',
-  // Tesla
-  'tesla|powerwall 3':    'Tesla Powerwall 3 (with Gateway)',
-  'tesla|powerwall3':     'Tesla Powerwall 3 (with Gateway)',
-  'tesla|powerwall 2':    'Tesla Powerwall 2',
-  // SolarEdge
-  'solaredge|se3000h':    'SolarEdge SE3000H-RW0T0BNN4',
-  'solaredge|se3680h':    'SolarEdge SE3680H-RW0T0BNN4',
-  'solaredge|se5000h':    'SolarEdge SE5000H-RW0T0BNN4',
-  'solaredge|se6000h':    'SolarEdge SE6000H-RW0T0BNN4',
-  // SolaX
-  'solax|x1-3.7':         'SolaX X1-Hybrid-3.7-D',
-  'solax|x1-5.0':         'SolaX X1-Hybrid-5.0-D',
-  'solax|x3-hybrid':      'SolaX X3-Hybrid-6.0-D',
-  // Growatt
-  'growatt|min 3000tl':   'Growatt MIN 3000TL-X',
-  'growatt|min 4000tl':   'Growatt MIN 4000TL-X',
-  'growatt|min 5000tl':   'Growatt MIN 5000TL-X',
-  'growatt|sph5000':      'Growatt SPH 5000TL BL-UP',
-  // Fronius
-  'fronius|primo 3.0':    'Fronius Primo 3.0-1',
-  'fronius|primo 4.0':    'Fronius Primo 4.0-1',
-  'fronius|primo 5.0':    'Fronius Primo 5.0-1',
-  'fronius|symo':         'Fronius Symo',
-  // SMA
-  'sma|sunny boy 3.0':    'SMA Sunny Boy 3.0',
-  'sma|sunny boy 5.0':    'SMA Sunny Boy 5.0',
-  'sma|sunny tripower':   'SMA Sunny Tripower',
-  // Huawei
-  'huawei|sun2000-3ktl':  'Huawei SUN2000-3KTL-L1',
-  'huawei|sun2000-5ktl':  'Huawei SUN2000-5KTL-L1',
-  'huawei|sun2000-6ktl':  'Huawei SUN2000-6KTL-L1',
-  'huawei|luna2000-5':    'Huawei LUNA2000-5-S0',
-  'huawei|luna2000-10':   'Huawei LUNA2000-10-S0',
-  // Sungrow
-  'sungrow|sh3.6rs':      'Sungrow SH3.6RS',
-  'sungrow|sh5.0rs':      'Sungrow SH5.0RS',
-  'sungrow|sh6.0rs':      'Sungrow SH6.0RS',
-  'sungrow|sh10rs':       'Sungrow SH10RS',
-  'sungrow|sbr096':       'Sungrow SBR096',
-  'sungrow|sbr128':       'Sungrow SBR128',
-  // SigEnergy
-  'sigenergy|5kw':        'SigenStor SigenES-5K-SG',
-  'sigenergy|sigenstore': 'SigenStor SigenES-5K-SG',
-  // GoodWe
-  'goodwe|et series':     'GoodWe ET-Series',
-  'goodwe|es series':     'GoodWe ES-Series',
-  // Enphase
-  'enphase|iq7':          'Enphase IQ7',
-  'enphase|iq7+':         'Enphase IQ7+',
-  'enphase|iq8':          'Enphase IQ8',
-  'enphase|iq8+':         'Enphase IQ8+',
+// ════════════════════════════════════════════════════════════
+// ENA / MCS MANUFACTURER REFERENCE DATABASE
+// Source: GreenGenUK ENA reference list (Mawgan Thomas, 23 Jul 2026)
+// Structure: per brand, a list of {model, kw|kwh, ref} records.
+// Lookup matches on model-text fragment first, then nearest size,
+// so it works whether the installer typed a full model number or
+// just brand + capacity.
+// ════════════════════════════════════════════════════════════
+const ENA_REF_DB = {
+  inverters: [
+    // Tesla
+    {brand:'tesla', model:'powerwall 3',        kw:9.0,   ref:'TESLA/14643'},
+    {brand:'tesla', model:'powerwall 3',        kw:10.0,  ref:'TESLA/14645'},
+    {brand:'tesla', model:'powerwall 3',        kw:11.04, ref:'TESLA/13773'},
+    {brand:'tesla', model:'powerwall 2',        kw:3.68,  ref:'TESLA/01866'},
+    {brand:'tesla', model:'powerwall 2',        kw:5.0,   ref:'TESLA/01866'},
+    {brand:'tesla', model:'backup gateway 2',   kw:null,  ref:'TESLA/14646'},
+    // Solis
+    {brand:'solis', model:'s5-eh1p3.0-l',       kw:3.0,   ref:'SOLIS/04291'},
+    {brand:'solis', model:'s5-eh1p3.6-l',       kw:3.6,   ref:'SOLIS/04291'},
+    {brand:'solis', model:'s5-eh1p4.6-l',       kw:4.6,   ref:'SOLIS/04291'},
+    {brand:'solis', model:'s5-eh1p5.0-l',       kw:5.0,   ref:'SOLIS/04291'},
+    {brand:'solis', model:'s5-eh1p6.0-l',       kw:6.0,   ref:'SOLIS/04291'},
+    {brand:'solis', model:'s6-eh1p8k-l-plus',   kw:8.0,   ref:'SOLIS/12789'},
+    {brand:'solis', model:'s6-eh3p5k-h',        kw:5.0,   ref:'SOLIS/10931'},
+    {brand:'solis', model:'s6-eh3p10k-h',       kw:10.0,  ref:'SOLIS/10931'},
+    {brand:'solis', model:'rai-3k-48es-5g',     kw:3.0,   ref:'SOLIS/01984'},
+    {brand:'solis', model:'s6-gr1p2.5k',        kw:2.5,   ref:'SOLIS/11051'},
+    {brand:'solis', model:'s6-gr1p3.6k',        kw:3.6,   ref:'SOLIS/11051'},
+    {brand:'solis', model:'s5-gr1p5k',          kw:5.0,   ref:'SOLIS/09321'},
+    {brand:'solis', model:'s5-gc25k',           kw:25.0,  ref:'SOLIS/13231'},
+    {brand:'solis', model:'s5-gc40k',           kw:40.0,  ref:'SOLIS/13231'},
+    {brand:'solis', model:'s5-gc50k',           kw:50.0,  ref:'SOLIS/13231'},
+    // Fox ESS
+    {brand:'fox ess', model:'h1-3.0',           kw:3.0,   ref:'FOXES/20563'},
+    {brand:'fox ess', model:'h1-3.7',           kw:3.68,  ref:'FOXES/20563'},
+    {brand:'fox ess', model:'h1-5.0',           kw:5.0,   ref:'FOXES/20563'},
+    {brand:'fox ess', model:'h1-6.0',           kw:6.0,   ref:'FOXES/20563'},
+    {brand:'fox ess', model:'kh7',              kw:7.0,   ref:'FOXES/13251'},
+    {brand:'fox ess', model:'kh10.5',           kw:10.5,  ref:'FOXES/13251'},
+    {brand:'fox ess', model:'h3-5.0',           kw:5.0,   ref:'FOXES/14832'},
+    {brand:'fox ess', model:'h3-10.0',          kw:10.0,  ref:'FOXES/14832'},
+    {brand:'fox ess', model:'h3-12.0',          kw:12.0,  ref:'FOXES/14832'},
+    {brand:'fox ess', model:'ac1-3.0-e',        kw:3.0,   ref:'FOXES/03154'},
+    {brand:'fox ess', model:'ac1-3.7-e',        kw:3.68,  ref:'FOXES/03154'},
+    {brand:'fox ess', model:'ac1-6.0-e',        kw:6.0,   ref:'FOXES/03154'},
+    {brand:'fox ess', model:'aio-h1-3.7',       kw:3.68,  ref:'FOXES/07505'},
+    {brand:'fox ess', model:'aio-h1-6.0',       kw:6.0,   ref:'FOXES/07505'},
+    {brand:'fox ess', model:'aio-h3-10.0',      kw:10.0,  ref:'FOXES/03515'},
+    {brand:'fox ess', model:'f3000',            kw:3.0,   ref:'FOXES/03148'},
+    {brand:'fox ess', model:'f6000',            kw:6.0,   ref:'FOXES/03148'},
+    {brand:'fox ess', model:'t10',              kw:10.0,  ref:'FOXES/03148'},
+    {brand:'fox ess', model:'t25',              kw:25.0,  ref:'FOXES/03148'},
+    {brand:'fox ess', model:'r50',              kw:50.0,  ref:'FOXES/18241'},
+    // Sigenergy
+    {brand:'sigenergy', model:'sigenstor ec 3.0 sp',  kw:3.0,  ref:'SIGEN/11599'},
+    {brand:'sigenergy', model:'sigenstor ec 3.6 sp',  kw:3.68, ref:'SIGEN/11599'},
+    {brand:'sigenergy', model:'sigenstor ec 5.0 sp',  kw:5.0,  ref:'SIGEN/11599'},
+    {brand:'sigenergy', model:'sigenstor ec 6.0 sp',  kw:6.0,  ref:'SIGEN/11599'},
+    {brand:'sigenergy', model:'sigenstor ec 5.0 tp',  kw:5.0,  ref:'SIGEN/13329'},
+    {brand:'sigenergy', model:'sigenstor ec 10.0 tp', kw:10.0, ref:'SIGEN/13329'},
+    {brand:'sigenergy', model:'sigenstor ec 15.0 tp', kw:15.0, ref:'SIGEN/13326'},
+    {brand:'sigenergy', model:'sigenstor ec 25.0 tp', kw:25.0, ref:'SIGEN/13326'},
+    {brand:'sigenergy', model:'sigenstor ac 3.0 sp',  kw:3.0,  ref:'SIGEN/11603'},
+    {brand:'sigenergy', model:'sigenstor ac 6.0 sp',  kw:6.0,  ref:'SIGEN/11603'},
+  ],
+  batteries: [
+    {brand:'tesla', model:'powerwall 3',                   kwh:13.5,  ref:'TESLA/14643 / TESLA/14645'},
+    {brand:'tesla', model:'powerwall 2',                   kwh:13.5,  ref:'TESLA/01866'},
+    {brand:'solis', model:'pylontech us3000c',             kwh:3.5,   ref:'N/A \u2014 regulated by Solis inverter'},
+    {brand:'solis', model:'byd premium hvs',                kwh:8.9,   ref:'N/A \u2014 regulated by Solis inverter'},
+    {brand:'fox ess', model:'ecs2900',                     kwh:2.88,  ref:'N/A \u2014 regulated by Fox ESS inverter'},
+    {brand:'fox ess', model:'ecs3300',                     kwh:3.32,  ref:'N/A \u2014 regulated by Fox ESS inverter'},
+    {brand:'fox ess', model:'ecs4100',                     kwh:4.03,  ref:'N/A \u2014 regulated by Fox ESS inverter'},
+    {brand:'fox ess', model:'ecs4800',                     kwh:4.74,  ref:'N/A \u2014 regulated by Fox ESS inverter'},
+    {brand:'fox ess', model:'hv2600',                      kwh:2.56,  ref:'N/A \u2014 regulated by Fox ESS inverter'},
+    {brand:'fox ess', model:'mira hv25',                   kwh:2.45,  ref:'N/A \u2014 regulated by Fox ESS inverter'},
+    {brand:'fox ess', model:'ep5',                         kwh:5.18,  ref:'N/A \u2014 regulated by Fox ESS inverter'},
+    {brand:'fox ess', model:'ep11',                        kwh:10.36, ref:'N/A \u2014 regulated by Fox ESS inverter'},
+    {brand:'fox ess', model:'aio internal battery module', kwh:2.6,   ref:'FOXES/07505 (AIO unit)'},
+    {brand:'sigenergy', model:'bat 5.0',                   kwh:5.0,   ref:'N/A \u2014 regulated by SigenStor EC'},
+    {brand:'sigenergy', model:'bat 8.0',                   kwh:8.0,   ref:'N/A \u2014 regulated by SigenStor EC'},
+  ]
 };
 
-function enaRefLookup(brand, model, manualRefs) {
-  const b = (brand||'').toLowerCase().trim();
-  const m = (model||'').toLowerCase().trim();
-  // 1. Check manual overrides stored on the job (keyed "brand|model" lowercase)
-  const manKey = b+'|'+m;
-  if(manualRefs && manualRefs[manKey] && manualRefs[manKey].trim()) return manualRefs[manKey].trim();
-  // 2. Try exact brand|model key in built-in DB
-  const exact = b+'|'+m;
-  if(ENA_PRODUCT_DB[exact]) return ENA_PRODUCT_DB[exact];
-  // 3. Try brand|fragment — sort by length DESC so longer (more specific) keys match first
-  var keys = Object.keys(ENA_PRODUCT_DB).sort(function(a,b){return b.length-a.length;});
-  for(var ki=0;ki<keys.length;ki++){
-    var k=keys[ki], parts=k.split('|');
-    if(parts[0]===b && m.indexOf(parts[1])!==-1) return ENA_PRODUCT_DB[k];
+function _enaNorm(s){ return (s||'').toLowerCase().trim(); }
+
+// Core matcher shared by inverters/batteries. `sizeKey` is 'kw' or 'kwh'.
+function _enaMatch(list, brand, model, size, sizeKey) {
+  const b = _enaNorm(brand), m = _enaNorm(model);
+  if(!b) return null;
+  const candidates = list.filter(function(e){ return e.brand===b; });
+  if(!candidates.length) return null;
+  // 1. Model-text match — longest model fragment contained in the typed model wins
+  var textMatches = candidates.filter(function(e){ return m && m.indexOf(e.model)!==-1; });
+  if(textMatches.length){
+    textMatches.sort(function(a,c){ return c.model.length-a.model.length; });
+    return textMatches[0];
   }
-  // 4. Fallback: brand + model (unresolved — will trigger manual ref prompt)
+  // 2. Nearest size match (kW for inverters, kWh for batteries)
+  const sz = parseFloat(size);
+  if(!isNaN(sz)){
+    var sized = candidates.filter(function(e){ return e[sizeKey]!=null; });
+    if(sized.length){
+      sized.sort(function(a,c){ return Math.abs(a[sizeKey]-sz)-Math.abs(c[sizeKey]-sz); });
+      return sized[0];
+    }
+  }
+  // 3. Single unambiguous candidate for the brand
+  if(candidates.length===1) return candidates[0];
+  return null;
+}
+
+function enaRefLookup(brand, model, manualRefs, size) {
+  const b = _enaNorm(brand), m = _enaNorm(model);
+  const manKey = b+'|'+m;
+  // 1. Manual override stored on the job always wins
+  if(manualRefs && manualRefs[manKey] && manualRefs[manKey].trim()) return manualRefs[manKey].trim();
+  // 2. Try inverter DB, then battery DB (size disambiguates which list is relevant,
+  //    but checking both is harmless since brands rarely collide across kW vs kWh keys)
+  var hit = _enaMatch(ENA_REF_DB.inverters, brand, model, size, 'kw');
+  if(hit) return hit.ref;
+  hit = _enaMatch(ENA_REF_DB.batteries, brand, model, size, 'kwh');
+  if(hit) return hit.ref;
+  // 3. Fallback: brand + model (unresolved — will trigger manual ref prompt)
   return (brand||'') + (model ? ' ' + model : '');
 }
 
-// Returns true if the ref came from the DB (resolved), false if it's just brand+model fallback
-function enaRefIsResolved(brand, model, manualRefs) {
-  const b = (brand||'').toLowerCase().trim();
-  const m = (model||'').toLowerCase().trim();
+// Returns true if the ref came from the DB or a manual override (resolved),
+// false if it's just the brand+model fallback (needs a human to fill in).
+function enaRefIsResolved(brand, model, manualRefs, size) {
+  const b = _enaNorm(brand), m = _enaNorm(model);
   const manKey = b+'|'+m;
   if(manualRefs && manualRefs[manKey] && manualRefs[manKey].trim()) return true;
-  const exact = b+'|'+m;
-  if(ENA_PRODUCT_DB[exact]) return true;
-  var keys = Object.keys(ENA_PRODUCT_DB).sort(function(a,b){return b.length-a.length;});
-  for(var ki=0;ki<keys.length;ki++){
-    var k=keys[ki], parts=k.split('|');
-    if(parts[0]===b && m.indexOf(parts[1])!==-1) return true;
-  }
+  if(_enaMatch(ENA_REF_DB.inverters, brand, model, size, 'kw')) return true;
+  if(_enaMatch(ENA_REF_DB.batteries, brand, model, size, 'kwh')) return true;
   return false;
 }
-
 function htmlG99(j) {
   const kwp=jK(j);
   const strs=jStrs(j);
@@ -4901,7 +4933,7 @@ function htmlG99(j) {
           +'<td style="border:1px solid #999;padding:3pt;text-align:center">'+esc((inv.brand||'')+((inv.model)?' '+inv.model:''))+'</td>'
           +'<td style="border:1px solid #999;padding:3pt;text-align:center">'+fmtD(j.hDate||j.start)+'</td>'
           +'<td style="border:1px solid #999;padding:3pt;text-align:center">Solar PV</td>'
-          +'<td style="border:1px solid #999;padding:3pt;text-align:center">'+esc(enaRefLookup(inv.brand,inv.model,j.enaRefs))+'</td>'
+          +'<td style="border:1px solid #999;padding:3pt;text-align:center">'+esc(enaRefLookup(inv.brand,inv.model,j.enaRefs,inv.kw))+'</td>'
           +'<td style="border:1px solid #999;padding:3pt;text-align:center">'+kw3+'</td>'
           +'<td style="border:1px solid #999;padding:3pt;text-align:center">'+kw1+'</td>'
           +'<td style="border:1px solid #999;padding:3pt;text-align:center">1</td>'
@@ -4912,7 +4944,7 @@ function htmlG99(j) {
           +'<td style="border:1px solid #999;padding:3pt;text-align:center">'+esc((bat.brand||'')+((bat.model)?' '+bat.model:''))+'</td>'
           +'<td style="border:1px solid #999;padding:3pt;text-align:center">'+fmtD(j.hDate||j.start)+'</td>'
           +'<td style="border:1px solid #999;padding:3pt;text-align:center">Electricity Storage</td>'
-          +'<td style="border:1px solid #999;padding:3pt;text-align:center">'+esc(enaRefLookup(bat.brand,bat.model,j.enaRefs))+'</td>'
+          +'<td style="border:1px solid #999;padding:3pt;text-align:center">'+esc(enaRefLookup(bat.brand,bat.model,j.enaRefs,bat.kwh))+'</td>'
           +'<td style="border:1px solid #999;padding:3pt;text-align:center"></td>'
           +'<td style="border:1px solid #999;padding:3pt;text-align:center"></td>'
           +'<td style="border:1px solid #999;padding:3pt;text-align:center">1</td>'
@@ -6350,7 +6382,7 @@ function renderEnaRefFields() {
   ];
 
   // Only show items whose ENA ref is NOT already resolved from the built-in DB
-  const unresolved = items.filter(p => !enaRefIsResolved(p.brand, p.model, refs));
+  const unresolved = items.filter(p => !enaRefIsResolved(p.brand, p.model, refs, p.kw!=null?p.kw:p.kwh));
 
   if(unresolved.length === 0) {
     container.innerHTML = '';
@@ -7627,7 +7659,7 @@ ctLoad();
 // To re-import: localStorage.removeItem('gguk_scaff'); localStorage.removeItem('gguk_ct_v2'); location.reload();
 // ════════════════════════════════════════════════════════════
 (function seedScaffoldData(){
-  var SEED_CONTACTS = [{"id": 1, "name": "(CRN)Stobbs", "email": "", "phone": "", "region": "CRN", "radius": 999, "notes": ""}, {"id": 2, "name": "(national)KC Scaffolding", "email": "", "phone": "", "region": "National", "radius": 999, "notes": ""}, {"id": 3, "name": "(National)JME", "email": "", "phone": "", "region": "National", "radius": 999, "notes": ""}, {"id": 4, "name": "(CRN)Rule Brothers", "email": "", "phone": "", "region": "CRN", "radius": 999, "notes": ""}, {"id": 5, "name": "(CRN) M&M Scaffolding", "email": "", "phone": "", "region": "CRN", "radius": 999, "notes": ""}, {"id": 6, "name": "(DVN) PSB", "email": "", "phone": "", "region": "DVN", "radius": 999, "notes": ""}, {"id": 7, "name": "(DVN) Avocet", "email": "", "phone": "", "region": "DVN", "radius": 999, "notes": ""}, {"id": 8, "name": "(DVN) Innate", "email": "", "phone": "", "region": "DVN", "radius": 999, "notes": ""}, {"id": 9, "name": "(DVN) Weller", "email": "", "phone": "", "region": "DVN", "radius": 999, "notes": ""}, {"id": 10, "name": "(DVN) BDD Scaffolding", "email": "", "phone": "", "region": "DVN", "radius": 999, "notes": ""}, {"id": 11, "name": "(DVN)Brace scaffolding", "email": "", "phone": "", "region": "DVN", "radius": 999, "notes": ""}, {"id": 12, "name": "Safeways scaffolding", "email": "", "phone": "", "region": "National", "radius": 999, "notes": ""}, {"id": 13, "name": "Straight up scaffolding", "email": "", "phone": "", "region": "National", "radius": 999, "notes": ""}, {"id": 14, "name": "Gravity scaffolding", "email": "", "phone": "", "region": "National", "radius": 999, "notes": ""}, {"id": 15, "name": "Olympia Scaffolding", "email": "", "phone": "", "region": "National", "radius": 999, "notes": ""}];
+  var SEED_CONTACTS = [{"id": 1, "name": "(CRN)Stobbs", "email": "", "phone": "", "region": "CRN", "radius": 999, "notes": ""}, {"id": 2, "name": "(national)KC Scaffolding", "email": "", "phone": "", "region": "National", "radius": 999, "notes": ""}, {"id": 3, "name": "(National)JME", "email": "", "phone": "", "region": "National", "radius": 999, "notes": ""}, {"id": 4, "name": "(CRN)Rule Brothers", "email": "", "phone": "", "region": "CRN", "radius": 999, "notes": ""}, {"id": 5, "name": "(CRN) M&M Scaffolding", "email": "", "phone": "", "region": "CRN", "radius": 999, "notes": ""}, {"id": 6, "name": "(DVN) PSB", "email": "", "phone": "", "region": "DVN", "radius": 999, "notes": ""}, {"id": 7, "name": "(DVN) Avocet", "email": "", "phone": "", "region": "DVN", "radius": 999, "notes": ""}, {"id": 8, "name": "(DVN) Innate", "email": "", "phone": "", "region": "DVN", "radius": 999, "notes": ""}, {"id": 9, "name": "(DVN) Weller", "email": "", "phone": "", "region": "DVN", "radius": 999, "notes": ""}, {"id": 10, "name": "(DVN) BDD Scaffolding", "email": "", "phone": "", "region": "DVN", "radius": 999, "notes": ""}, {"id": 11, "name": "(DVN)Brace scaffolding", "email": "", "phone": "", "region": "DVN", "radius": 999, "notes": ""}, {"id": 12, "name": "Safeways scaffolding", "email": "", "phone": "", "region": "National", "radius": 999, "notes": ""}, {"id": 13, "name": "Straight up scaffolding", "email": "", "phone": "", "region": "National", "radius": 999, "notes": ""}, {"id": 14, "name": "Gravity scaffolding", "email": "", "phone": "", "region": "National", "radius": 999, "notes": ""}, {"id": 15, "name": "Olympia Scaffolding", "email": "", "phone": "", "region": "National", "radius": 999, "notes": ""}, {"id": 16, "name": "Tubix Scaffolding", "email": "aiden@tubix.co.uk", "phone": "", "region": "CRN", "radius": 150, "notes": "Based in Camborne \u2014 covers up to 150 miles"}];
   var SEED_CT = {"13397.0": {"quotes": {"1": {"price": 450.0, "accepted": false, "date": "", "notes": ""}, "2": {"price": 400.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 350.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 650.0}, "11747.0": {"quotes": {"1": {"price": 400.0, "accepted": true, "date": "", "notes": ""}, "3": {"price": 640.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 400.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 650.0}, "12188.0": {"quotes": {"3": {"price": 540.0, "accepted": true, "date": "", "notes": ""}, "8": {"price": 850.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 550.0}, "11896.0": {"quotes": {"2": {"price": 550.0, "accepted": true, "date": "", "notes": ""}, "8": {"price": 850.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 500.0}, "12036.0": {"quotes": {"2": {"price": 375.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 550.0}, "11201.0": {"quotes": {"1": {"price": 550.0, "accepted": false, "date": "", "notes": ""}, "2": {"price": 500.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 400.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 900.0}, "7578.0": {"quotes": {"2": {"price": 715.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 750.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 1000.0}, "13394.0": {"quotes": {"1": {"price": 650.0, "accepted": false, "date": "", "notes": ""}, "2": {"price": 450.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 550.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 650.0}, "13344.0": {"quotes": {"1": {"price": 650.0, "accepted": false, "date": "", "notes": ""}, "2": {"price": 480.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 600.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 877.5}, "13414.0": {"quotes": {"1": {"price": 850.0, "accepted": false, "date": "", "notes": ""}, "2": {"price": 300.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 550.0}, "13487.0": {"quotes": {"2": {"price": 450.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 600.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 550.0}, "13484.0": {"quotes": {"1": {"price": 800.0, "accepted": false, "date": "", "notes": ""}, "2": {"price": 500.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 600.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 1022.0}, "13047.0": {"quotes": {"2": {"price": 700.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 800.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 798.0}, "13497.0": {"quotes": {"2": {"price": 1250.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 1500.0, "accepted": false, "date": "", "notes": ""}, "14": {"price": 1250.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 805.0}, "13214.0": {"quotes": {"1": {"price": 800.0, "accepted": false, "date": "", "notes": ""}, "2": {"price": 450.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 500.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 500.0}, "13280.0": {"quotes": {"4": {"price": 450.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 750.0}, "9798.0": {"quotes": {"2": {"price": 450.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 350.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 750.0}, "13560.0": {"quotes": {"2": {"price": 650.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 750.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 650.0}, "13520.0": {"quotes": {"1": {"price": 1500.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 475.0}, "13461.0": {"quotes": {"1": {"price": 650.0, "accepted": false, "date": "", "notes": ""}, "2": {"price": 320.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 350.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 500.0}, "13847.0": {"quotes": {"1": {"price": 1000.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 600.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 550.0}, "11190.0": {"quotes": {"1": {"price": 450.0, "accepted": false, "date": "", "notes": ""}, "2": {"price": 350.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 350.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 350.0}, "11305.0": {"quotes": {"1": {"price": 1000.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 600.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 800.0}, "13364.0": {"quotes": {"1": {"price": 900.0, "accepted": false, "date": "", "notes": ""}, "2": {"price": 600.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 650.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 600.0}, "12104.0": {"quotes": {"2": {"price": 700.0, "accepted": true, "date": "", "notes": ""}, "3": {"price": 1080.0, "accepted": false, "date": "", "notes": ""}, "10": {"price": 800.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 560.0}, "8275.0": {"quotes": {"1": {"price": 580.0, "accepted": false, "date": "", "notes": ""}, "2": {"price": 450.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 500.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 550.0}, "11569.0": {"quotes": {"2": {"price": 700.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 850.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 800.0}, "5932.0": {"quotes": {"2": {"price": 495.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 650.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 736.0}, "13530.0": {"quotes": {"2": {"price": 1095.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 1200.0, "accepted": false, "date": "", "notes": ""}, "8": {"price": 1475.0, "accepted": false, "date": "", "notes": ""}, "14": {"price": 1890.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 945.0}, "11544.0": {"quotes": {"2": {"price": 1500.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 1200.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 1200.0}, "16573.0": {"quotes": {"4": {"price": 650.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 650.0}, "13459.0": {"quotes": {"2": {"price": 750.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 1000.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 750.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 805.0}, "6930.0": {"quotes": {"2": {"price": 280.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 350.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 600.0}, "9795 - 10518": {"quotes": {"2": {"price": 1200.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 1600.0}, "12126.0": {"quotes": {"2": {"price": 600.0, "accepted": false, "date": "", "notes": ""}, "3": {"price": 850.0, "accepted": false, "date": "", "notes": ""}, "14": {"price": 850.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "16367.0": {"quotes": {"2": {"price": 775.0, "accepted": false, "date": "", "notes": ""}, "3": {"price": 950.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 550.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 550.0}, "11878.0": {"quotes": {"3": {"price": 950.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 600.0, "accepted": true, "date": "", "notes": ""}, "12": {"price": 700.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 680.0}, "6856.0": {"quotes": {"2": {"price": 550.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 750.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 500.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 750.0}, "9055.0": {"quotes": {"2": {"price": 725.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 750.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 1200.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 2100.0}, "16419.0": {"quotes": {"2": {"price": 950.0, "accepted": false, "date": "", "notes": ""}, "3": {"price": 750.0, "accepted": true, "date": "", "notes": ""}, "8": {"price": 1075.0, "accepted": false, "date": "", "notes": ""}, "10": {"price": 1200.0, "accepted": false, "date": "", "notes": ""}, "13": {"price": 2000.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 720.0}, "13311.0": {"quotes": {"3": {"price": 950.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 850.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 800.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 1120.0}, "10524.0": {"quotes": {"2": {"price": 1750.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 800.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 1200.0}, "16400.0": {"quotes": {"2": {"price": 675.0, "accepted": true, "date": "", "notes": ""}, "3": {"price": 700.0, "accepted": false, "date": "", "notes": ""}, "13": {"price": 1950.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 720.0}, "16421.0": {"quotes": {"2": {"price": 745.0, "accepted": true, "date": "", "notes": ""}, "13": {"price": 2000.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 800.0}, "13577.0": {"quotes": {"2": {"price": 1050.0, "accepted": true, "date": "", "notes": ""}, "3": {"price": 1150.0, "accepted": false, "date": "", "notes": ""}, "13": {"price": 2100.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 750.0}, "13456.0": {"quotes": {"2": {"price": 650.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 900.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 750.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 800.0}, "13451.0": {"quotes": {"2": {"price": 700.0, "accepted": false, "date": "", "notes": ""}, "3": {"price": 1140.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 450.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 650.0}, "9387.0": {"quotes": {"2": {"price": 1500.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 1850.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 1300.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 1351.0}, "9778.0": {"quotes": {"2": {"price": 1500.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 1800.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "11292.0": {"quotes": {"2": {"price": 1250.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 750.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 550.0}, "13186.0": {"quotes": {"2": {"price": 550.0, "accepted": false, "date": "", "notes": ""}, "3": {"price": 500.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "13663.0": {"quotes": {"2": {"price": 900.0, "accepted": false, "date": "", "notes": ""}, "3": {"price": 1380.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 750.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 700.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "10661.0": {"quotes": {"2": {"price": 550.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 900.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 700.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 917.0}, "16393.0": {"quotes": {"2": {"price": 1100.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 1100.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 1400.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "13690.0": {"quotes": {"2": {"price": 1250.0, "accepted": false, "date": "", "notes": ""}, "3": {"price": 1620.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 700.0, "accepted": true, "date": "", "notes": ""}, "13": {"price": 1400.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 500.0}, "16662.0": {"quotes": {"2": {"price": 400.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 600.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 450.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "13346.0": {"quotes": {"2": {"price": 560.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 450.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 385.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 600.0}, "16414.0": {"quotes": {"2": {"price": 300.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 550.0}, "16627.0": {"quotes": {"2": {"price": 450.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 500.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 600.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "13522.0": {"quotes": {"2": {"price": 750.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 1300.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 1000.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 1400.0}, "6352.0": {"quotes": {"2": {"price": 525.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 480.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 375.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": ""}, "11738.0": {"quotes": {"2": {"price": 500.0, "accepted": true, "date": "", "notes": ""}, "10": {"price": 500.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 580.0}, "4064.0": {"quotes": {"4": {"price": 350.0, "accepted": true, "date": "", "notes": ""}, "10": {"price": 350.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 550.0}, "13526/13527": {"quotes": {"2": {"price": 450.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 550.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 800.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 650.0}, "16576.0": {"quotes": {"2": {"price": 440.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 600.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 450.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "16382.0": {"quotes": {"2": {"price": 700.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": 600.0}, "16640.0": {"quotes": {"2": {"price": 550.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 700.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 750.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 650.0}, "16690.0": {"quotes": {"2": {"price": 450.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "12157.0": {"quotes": {"2": {"price": 500.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 600.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "13087.0": {"quotes": {"2": {"price": 600.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 850.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "13529.0": {"quotes": {"2": {"price": 900.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 1200.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 1050.0}, "16734.0": {"quotes": {"2": {"price": 900.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 900.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 1800.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "16725.0": {"quotes": {"2": {"price": 950.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 800.0, "accepted": true, "date": "", "notes": ""}, "12": {"price": 1500.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 980.0}, "10055.0": {"quotes": {"2": {"price": 375.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 750.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 770.0}, "16350 - Farm": {"quotes": {"2": {"price": 1350.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 1350.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 1400.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "16350 - Main House": {"quotes": {"2": {"price": 600.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 650.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 600.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "13533.0": {"quotes": {"2": {"price": 650.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "16937.0": {"quotes": {"2": {"price": 375.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 650.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 375.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "13628.0": {"quotes": {"2": {"price": 2950.0, "accepted": false, "date": "", "notes": ""}, "3": {"price": 3950.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 4250.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 4400.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "16730/10158": {"quotes": {"2": {"price": 500.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 850.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 600.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "13431.0": {"quotes": {"2": {"price": 1100.0, "accepted": true, "date": "", "notes": ""}, "12": {"price": 1200.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 1200.0}, "16789.0": {"quotes": {"2": {"price": 650.0, "accepted": false, "date": "", "notes": ""}, "3": {"price": 500.0, "accepted": false, "date": "", "notes": ""}, "10": {"price": 700.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "16380.0": {"quotes": {"10": {"price": 700.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "16336.0": {"quotes": {"2": {"price": 600.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 900.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 1125.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "16639.0": {"quotes": {"4": {"price": 780.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 1200.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "12032.0": {"quotes": {"2": {"price": 1000.0, "accepted": true, "date": "", "notes": ""}, "4": {"price": 1400.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 1092.0}, "13601.0": {"quotes": {"2": {"price": 1200.0, "accepted": false, "date": "", "notes": ""}, "3": {"price": 900.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": 840.0}, "16642.0": {"quotes": {"2": {"price": 1750.0, "accepted": false, "date": "", "notes": ""}, "3": {"price": 2800.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "13705.0": {"quotes": {"2": {"price": 480.0, "accepted": false, "date": "", "notes": ""}, "3": {"price": 850.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 750.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 700.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "16962.0": {"quotes": {"2": {"price": 1500.0, "accepted": true, "date": "", "notes": ""}}, "costPreMarkup": ""}, "16665.0": {"quotes": {"2": {"price": 450.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 700.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 600.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "16792.0": {"quotes": {"2": {"price": 575.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 1450.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 800.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "11786.0": {"quotes": {"2": {"price": 1000.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 950.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 900.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "17052.0": {"quotes": {"2": {"price": 1100.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 1300.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 900.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "16722.0": {"quotes": {"2": {"price": 475.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 450.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 500.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "12175.0": {"quotes": {"2": {"price": 375.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 650.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 450.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "16761.0": {"quotes": {"2": {"price": 675.0, "accepted": false, "date": "", "notes": ""}, "4": {"price": 950.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 1100.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "17015.0": {"quotes": {"2": {"price": 500.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "11082.0": {"quotes": {"4": {"price": 480.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 600.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "16706.0": {"quotes": {"4": {"price": 800.0, "accepted": false, "date": "", "notes": ""}, "12": {"price": 1100.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "16778.0": {"quotes": {"12": {"price": 1400.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}, "5845.0": {"quotes": {"12": {"price": 1750.0, "accepted": false, "date": "", "notes": ""}}, "costPreMarkup": ""}};
 
   // Always seed contacts (overwrite to ensure data is present)
