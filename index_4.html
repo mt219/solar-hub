@@ -2188,8 +2188,19 @@ async function gdPull() {
       JOBS=merged;
       try{localStorage.setItem('gguk_v9_jobs',JSON.stringify(JOBS));}catch(e){}
       refreshSaved();
+      let scaffMsg='';
+      if(Array.isArray(cloud.scaffContacts)&&cloud.scaffContacts.length){
+        const smerged=[...cloud.scaffContacts];
+        (typeof SCAFF_CONTACTS!=='undefined'?SCAFF_CONTACTS:[]).forEach(function(lc){
+          if(!smerged.find(function(cc){return cc.id===lc.id||((cc.email||'').toLowerCase()&&cc.email.toLowerCase()===(lc.email||'').toLowerCase());}))smerged.push(lc);
+        });
+        SCAFF_CONTACTS=smerged;
+        try{localStorage.setItem('gguk_scaff',JSON.stringify(SCAFF_CONTACTS));}catch(e){}
+        if(typeof renderScaffContacts==='function')renderScaffContacts();
+        scaffMsg=' · '+SCAFF_CONTACTS.length+' scaffold co'+(SCAFF_CONTACTS.length!==1?'s':'');
+      }
       const n=merged.length;
-      gdStatus('✔ Synced '+n+' job'+(n!==1?'s':'')+' · '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
+      gdStatus('✔ Synced '+n+' job'+(n!==1?'s':'')+scaffMsg+' · '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
     }
   }catch(e){gdStatus('Pull failed: '+e.message,true);}
 }
@@ -2199,7 +2210,7 @@ async function gdPush() {
   gdStatus('Saving to Drive…');
   try{
     let fid=GD_FILE_ID||await gdFindFile();
-    const body=JSON.stringify({jobs:JOBS,updated:new Date().toISOString()});
+    const body=JSON.stringify({jobs:JOBS,scaffContacts:(typeof SCAFF_CONTACTS!=='undefined'?SCAFF_CONTACTS:[]),updated:new Date().toISOString()});
     let r;
     if(fid){
       r=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+fid+'?uploadType=media',
@@ -2326,11 +2337,13 @@ function saveScaffModal(editIdx) {
   saveScaffContacts(); saveScaffQuotes(); renderScaffContacts();
   loadScaffQuotes(); renderScaffQuotes();
   document.getElementById('scaff-modal').style.display='none';
+  if(typeof gdPush==='function') gdPush();
 }
 
 function removeScaffContact(i){
   if(!confirm('Remove '+SCAFF_CONTACTS[i]?.name+'?')) return;
   SCAFF_CONTACTS.splice(i,1); saveScaffContacts(); renderScaffContacts();
+  if(typeof gdPush==='function') gdPush();
 }
 
 // Auto-select scaffold contacts based on job address proximity
@@ -5317,6 +5330,25 @@ const SchematicEngine = (() => {
       ].join(''));
     }
 
+    // PV array annotation box — sits beside the arrays in the roof zone
+    if(co.panelNote&&co.panelNote.length){
+      const lines=co.panelNote.slice(0,5);
+      const longest=lines.reduce((a,l)=>Math.max(a,l.length),0);
+      const bw=snap(Math.min(300,Math.max(190,longest*4.1+16)));
+      const bh=snap(20+lines.length*11+6);
+      const arrRight=STR_X0+(nStr-1)*STR_PITCH+26;   // right edge of last array
+      const bx=snap(Math.min(arrRight+34,C.ML+C.SLD_W-6-bw));
+      const by=snap(Y.Z_ROOF+((Y.Z_PLANT-Y.Z_ROOF)-bh)/2);
+      s+=G('pv-note',[
+        R(bx,by,bw,bh,K.WHITE,K.DARK,LWt.MED),
+        R(bx,by,bw,15,K.XLTGREY,K.DARK,LWt.HAIR),
+        T(bx+6,by+11,'PV ARRAY',TS.SMALL,'start',true,K.DARK),
+        ...lines.map((ln,i)=>T(bx+6,by+27+i*11,ln,TS.SMALL,'start',i===0,i===0?K.DARK:K.SUBLABEL)),
+        // dashed leader back to the array group
+        L(bx,snap(by+bh/2),snap(arrRight+8),snap(by+bh/2),K.GREY,LWt.HAIR,'4,3'),
+      ].join(''));
+    }
+
     // DC isolator
     s+=G('dc-iso',SYM.dcIsolator(RAIL_X,Y.DC_ISO,co.dcIsoRating||'DC ISO.'));
     s+=T(RAIL_X+36,Y.DC_ISO-4,'DC String Combiner / Isolator',TS.SMALL,'start',false,K.SUBLABEL);
@@ -5456,13 +5488,35 @@ const SchematicEngine = (() => {
     const strings=strs.map((str,i)=>str.short||('STR '+(i+1)));
     const stringPanels=strs.map(str=>str.panelsPerString||'?');
     if(!strings.length){strings.push('STR 1');stringPanels.push('?');}
+
+    // ── PV ARRAY ANNOTATION ─────────────────────────────────────────────────
+    // e.g.  12 × Aiko 475W Panels
+    //       2 Strings of 5 modules
+    //       1 String of 2 modules
+    const panelNote=[];
+    (j.panels||[]).forEach(p=>{
+      const q=parseInt(p.qty)||0;
+      const desc=[p.brand,(p.wp?p.wp+'W':'')].filter(Boolean).join(' ').trim();
+      if(q>0&&desc) panelNote.push(esc(q+' \u00D7 '+desc+' Panel'+(q===1?'':'s')));
+    });
+    // Group strings by panels-per-string
+    const ppsCount={};
+    strs.forEach(str=>{
+      const n=parseInt(str.panelsPerString)||0;
+      if(n>0) ppsCount[n]=(ppsCount[n]||0)+1;
+    });
+    Object.keys(ppsCount).map(Number).sort((a,b)=>b-a).forEach(n=>{
+      const c=ppsCount[n];
+      panelNote.push(c+' String'+(c===1?'':'s')+' of '+n+' module'+(n===1?'':'s'));
+    });
+    if(kwp>0) panelNote.push('Total array \u2014 '+kwp.toFixed(2)+' kWp');
     return {
       systemType,kwp:kwp>0?kwp.toFixed(2):null,is3ph,hasBat,g99,
       invLabel1,invLabel2,invLabel3,invLabel4,invLabel5,
       batBrand:bat0.brand||'',batKwh:bat0.kwh||'?',batModel:bat0.model||'',
       acIsoRating,mcbRating,dcIsoRating,
       genMeterModel:is3ph?'Emlite ECA3 (3-phase)':'Emlite ECA2.v',
-      strings,stringPanels,hasBattery:hasBat,
+      strings,stringPanels,hasBattery:hasBat,panelNote,
     };
   }
 
