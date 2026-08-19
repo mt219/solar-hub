@@ -2080,9 +2080,42 @@ async function autoLookupVocIsc(){
 // PERSIST — localStorage + Google Drive sync
 // ════════════════════════════════════════════════════════════
 
-function save() {
+// localStorage is a SECONDARY CACHE ONLY — Google Drive (gdPush) is authoritative.
+// Large base64 image fields (layoutImg / scaffImg / aerialImg) are persisted to Drive
+// in full but can overflow the ~5MB localStorage quota. When that happens we cache a
+// slim copy (images replaced with an in-Drive marker) so the local cache still holds
+// every job's data — the full images remain in memory and are synced to Drive by gdPush.
+var GD_IMG_FIELDS = ['layoutImg','scaffImg','aerialImg'];
+var GD_IMG_PLACEHOLDER = '__IN_DRIVE__';
+
+function persistJobs() {
+  // Returns true on success (full or slim), false if even the slim write failed.
   try {
     localStorage.setItem('gguk_v9_jobs', JSON.stringify(JOBS));
+    return true;
+  } catch(e) {
+    // Quota exceeded (or similar). Retry with a slim, image-stripped copy so the
+    // cache stays usable. The full images are safe in memory + Google Drive.
+    try {
+      var slim = JOBS.map(function(j){
+        var c = Object.assign({}, j);
+        GD_IMG_FIELDS.forEach(function(f){ if(c[f] && c[f] !== GD_IMG_PLACEHOLDER) c[f] = GD_IMG_PLACEHOLDER; });
+        return c;
+      });
+      localStorage.setItem('gguk_v9_jobs', JSON.stringify(slim));
+      if(typeof gdStatus === 'function') gdStatus('⚠ Local cache trimmed (images stored in Drive only) — '+JOBS.length+' jobs', false);
+      return true;
+    } catch(e2) {
+      if(typeof gdStatus === 'function') gdStatus('Local save failed: '+e2.name+' — Drive sync still active', true);
+      console.error('[persistJobs] localStorage write failed even after trimming images:', e2);
+      return false;
+    }
+  }
+}
+
+function save() {
+  persistJobs();
+  try {
     localStorage.setItem('gguk_v9_cfg', JSON.stringify(MCfg));
   } catch(e) {}
   if(GD_TOKEN) {
@@ -2186,7 +2219,7 @@ async function gdPull() {
       const merged=[...cloud.jobs];
       JOBS.forEach(function(lj){if(!merged.find(function(cj){return cj.id===lj.id;}))merged.push(lj);});
       JOBS=merged;
-      try{localStorage.setItem('gguk_v9_jobs',JSON.stringify(JOBS));}catch(e){}
+      persistJobs();
       refreshSaved();
       let scaffMsg='';
       if(Array.isArray(cloud.scaffContacts)&&cloud.scaffContacts.length){
@@ -2210,6 +2243,24 @@ async function gdPush() {
   gdStatus('Saving to Drive…');
   try{
     let fid=GD_FILE_ID||await gdFindFile();
+    // SAFETY: if any in-memory job carries an image placeholder (can happen when the
+    // app booted from a trimmed localStorage cache before a pull), restore the real
+    // image from the current Drive copy so we never overwrite a real image with a marker.
+    if(fid && JOBS.some(function(j){return GD_IMG_FIELDS.some(function(f){return j[f]===GD_IMG_PLACEHOLDER;});})){
+      try{
+        const cr=await fetch('https://www.googleapis.com/drive/v3/files/'+fid+'?alt=media',
+          {headers:{Authorization:'Bearer '+GD_TOKEN}});
+        if(cr.ok){
+          const cloudData=await cr.json();
+          const cloudById={};
+          (cloudData.jobs||[]).forEach(function(cj){cloudById[cj.id]=cj;});
+          JOBS.forEach(function(j){
+            const cj=cloudById[j.id];
+            if(cj)GD_IMG_FIELDS.forEach(function(f){if(j[f]===GD_IMG_PLACEHOLDER&&cj[f]&&cj[f]!==GD_IMG_PLACEHOLDER)j[f]=cj[f];});
+          });
+        }
+      }catch(e){}
+    }
     const body=JSON.stringify({jobs:JOBS,scaffContacts:(typeof SCAFF_CONTACTS!=='undefined'?SCAFF_CONTACTS:[]),updated:new Date().toISOString()});
     let r;
     if(fid){
@@ -7641,7 +7692,7 @@ load();
       JOBS.push(fresh);
     }
   });
-  try { localStorage.setItem('gguk_v9_jobs', JSON.stringify(JOBS)); } catch(e) {}
+  persistJobs();
   console.log('[Seed] August 2026 jobs upserted');
   setTimeout(() => { try { renderSaved(); } catch(e) {} }, 0);
 })();
@@ -8638,7 +8689,7 @@ bulkInit();
     }
   }
   if (changed) {
-    try { localStorage.setItem('gguk_v9_jobs', JSON.stringify(JOBS)); } catch(e) {}
+    persistJobs();
     renderSaved();
     refreshUI();
   }
@@ -10253,7 +10304,7 @@ finJobsLoad();finLoad();soLoad();subLoad();
   for (const job of AUG2026B_JOBS) {
     if (!JOBS.find(j => j.ref === job.ref)) { JOBS.push(job); changed = true; }
   }
-  if (changed) { try { localStorage.setItem('gguk_v9_jobs', JSON.stringify(JOBS)); } catch(e){} renderSaved(); }
+  if (changed) { persistJobs(); renderSaved(); }
 })();
 
 // Standalone mode - no Supabase
@@ -10720,7 +10771,7 @@ function genScaffPlan(){
       if(d){ for(var k in d){ if(!j[k]) {j[k]=d[k]; ch=true;} } }
       if(VALUES[j.ref] && !j.contractValue){ j.contractValue=VALUES[j.ref]; ch=true; }
     }
-    if(ch){ try{ localStorage.setItem('gguk_v9_jobs', JSON.stringify(JOBS)); }catch(e){} try{renderSaved();}catch(e){} }
+    if(ch){ persistJobs(); try{renderSaved();}catch(e){} }
     for(var r in VALUES){ var jc=jcJob(r); if(!jc.sale) jc.sale=VALUES[r]; }
     jcSave();
     localStorage.setItem('gguk_seed_plan_v1','1');
