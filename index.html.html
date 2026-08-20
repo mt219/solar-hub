@@ -152,6 +152,11 @@ select.ei{cursor:pointer}
 .sp-cell:hover{filter:brightness(.88)}
 .sp-cell.empty{background:#fff}.sp-cell.empty:hover{background:#f8f7f5}
 .sp-lbl{font-size:8px;font-weight:700;pointer-events:none;color:rgba(0,0,0,.55);font-family:var(--fn);letter-spacing:.04em}
+.sp-cell{position:relative;display:table-cell;vertical-align:middle;text-align:center}
+.sp-ori{position:absolute;top:1px;right:3px;font-size:9px;line-height:1;pointer-events:none;color:rgba(0,0,0,.5)}
+.sp-cell.sp-land{box-shadow:inset 0 0 0 2px rgba(0,0,0,.28)}
+.sp-cell.sp-port{box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.sp-orient-on{background:var(--grn-l)!important;color:var(--grn)!important;border-color:var(--grn-m)!important}
 .sp-tracker{border-collapse:collapse;font-size:12px}
 .sp-tracker td,.sp-tracker th{border:1px solid #9ca3af;padding:5px 9px;text-align:center;min-width:72px}
 .sp-tracker th{background:#dce6f1;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
@@ -568,6 +573,27 @@ select.ei{cursor:pointer}
 
   <div class="card">
     <div class="card-head">
+      <div class="ch-icon" style="background:#e0f2fe">📸</div>
+      <div><div class="ch-title">Property photos</div><div class="ch-sub">Drag &amp; drop 1–20 photos — appear on the scaffold plan &amp; in the job pack</div></div>
+    </div>
+    <div class="card-body">
+      <div id="pp-drop" style="border:2.5px dashed var(--bdr2);border-radius:11px;padding:26px 20px;text-align:center;cursor:pointer;position:relative;background:var(--bg);transition:.15s"
+           onpaste="ppPaste(event)"
+           ondragover="event.preventDefault();this.style.borderColor='var(--grn-m)';this.style.background='var(--grn-l)';"
+           ondragleave="this.style.borderColor='';this.style.background='var(--bg)';"
+           ondrop="ppDrop(event);this.style.borderColor='';this.style.background='var(--bg)';">
+        <input type="file" accept="image/*" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%" onchange="ppAddFiles(this.files);this.value='';">
+        <div style="font-size:26px;line-height:1;margin-bottom:6px">🏠</div>
+        <div style="font-size:13px;font-weight:600;color:var(--ink2)">Drop property photos here, or click to browse</div>
+        <div style="font-size:11px;color:var(--ink3);margin-top:4px">You can also paste (⌘/Ctrl-V) a copied image · JP/PNG · up to 20</div>
+      </div>
+      <div id="pp-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:12px"></div>
+      <div id="pp-count" style="font-size:11px;color:var(--ink3);margin-top:8px"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
       <div class="ch-icon" style="background:#f3e8ff">👷</div>
       <div><div class="ch-title">Install staff</div><div class="ch-sub">Role "Electrician" auto-fills F43 tester name</div></div>
       <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
@@ -743,10 +769,46 @@ select.ei{cursor:pointer}
         <input type="number" id="sp-rows" value="4" min="1" max="20" style="width:50px;background:var(--bg);border:1.5px solid var(--bdr2);border-radius:7px;padding:5px 8px;font-size:12px;outline:none;text-align:center" oninput="spRebuild()">
         <span style="font-size:12px;color:var(--ink3)">rows</span>
         <div class="sp-divider"></div>
+        <button class="btn btn-ghost btn-xs" id="sp-orient-btn" onclick="spToggleOrientMode()" title="Toggle then click panels to flip portrait/landscape">▯▭ Orientation</button>
+        <select id="sp-def-orient" onchange="SP_DEFAULT_ORIENT=this.value" style="font-size:11px;padding:4px 6px;background:var(--bg);border:1.5px solid var(--bdr2);border-radius:7px" title="Orientation applied to newly painted panels">
+          <option value="P">New = Portrait ▯</option>
+          <option value="L">New = Landscape ▭</option>
+        </select>
+        <div class="sp-divider"></div>
         <button class="btn btn-ghost btn-xs" onclick="spAutoFill()">⚡ Auto-fill</button>
         <button class="btn btn-ghost btn-xs" onclick="spClear()">Clear</button>
       </div>
+
+      <!-- Auto string plan from proposal screenshot -->
+      <div style="border:1.5px solid var(--bdr);border-radius:11px;padding:12px 14px;margin-bottom:12px;background:var(--card)">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:700">⚡ Auto string plan</span>
+          <span style="font-size:11px;color:var(--ink3)">Upload the panel-layout screenshot from the proposal — the app detects panels, groups them by roof face, and builds strings to fit your inverter.</span>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch">
+          <div id="sp-auto-drop" style="flex:1;min-width:220px;border:2px dashed var(--bdr2);border-radius:9px;padding:16px;text-align:center;cursor:pointer;position:relative;background:var(--bg)"
+               onpaste="spAutoPaste(event)"
+               ondragover="event.preventDefault();this.style.borderColor='var(--grn-m)'"
+               ondragleave="this.style.borderColor=''"
+               ondrop="spAutoDrop(event);this.style.borderColor=''">
+            <input type="file" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%" onchange="spAutoFromFiles(this.files);this.value='';">
+            <div style="font-size:20px">🖼️</div>
+            <div style="font-size:12px;font-weight:600;color:var(--ink2)">Drop / paste / click — proposal layout screenshot</div>
+            <div style="font-size:10px;color:var(--ink3);margin-top:2px">Dark panels on a lighter roof work best</div>
+          </div>
+          <img id="sp-auto-preview" style="max-height:120px;max-width:220px;border-radius:8px;border:1px solid var(--bdr);display:none;object-fit:contain">
+        </div>
+        <div id="sp-auto-status" style="font-size:11px;color:var(--ink3);margin-top:8px"></div>
+        <div id="sp-auto-actions" style="display:none;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn btn-green btn-sm" onclick="spAutoApply()">✓ Looks right — build string plan</button>
+          <button class="btn btn-ghost btn-sm" onclick="spAutoAdjust(-1)">− Fewer panels</button>
+          <button class="btn btn-ghost btn-sm" onclick="spAutoAdjust(1)">+ More panels</button>
+          <button class="btn btn-ghost btn-sm" onclick="spAutoDismiss()">Cancel / do it manually</button>
+        </div>
+      </div>
+
       <div class="sp-wrap"><table class="sp-table" id="sp-table"></table></div>
+      <div id="sp-orient-hint" style="display:none;font-size:11px;color:var(--grn);margin-top:8px;font-weight:600">Orientation mode ON — click any panel to flip it portrait ▯ / landscape ▭. Click the button again to go back to painting.</div>
       <div style="font-size:11px;color:var(--ink3);margin-top:8px">Click to paint · drag across cells · right-click to erase a cell</div>
     </div>
     <div class="card-foot">
@@ -1958,11 +2020,11 @@ const BLANK = () => ({
   dnoRef:'',
   mpan:'',
   pVoc:'', pIsc:'',
-  spGrid: null, spCols:8, spRows:4,
+  spGrid: null, spOrient: null, spCols:8, spRows:4,
   mondayItemId: null,
   hDate: '', hDno: '',
   enaRefs: {},
-  layoutImg: null, scaffImg: null, scaffName: null, aerialImg: null
+  layoutImg: null, scaffImg: null, scaffName: null, aerialImg: null, propertyPhotos: []
 });
 
 let J = BLANK();
@@ -1985,6 +2047,8 @@ const PAL = [
 let SP_COLOR = 's0';
 let SP_ERASE = false;
 let SP_PAINTING = false;
+let SP_ORIENT_MODE = false;   // when true, clicking a cell flips its panel portrait/landscape
+let SP_DEFAULT_ORIENT = 'P';  // default orientation for newly painted panels ('P' portrait, 'L' landscape)
 
 // ════════════════════════════════════════════════════════════
 
@@ -2086,6 +2150,7 @@ async function autoLookupVocIsc(){
 // slim copy (images replaced with an in-Drive marker) so the local cache still holds
 // every job's data — the full images remain in memory and are synced to Drive by gdPush.
 var GD_IMG_FIELDS = ['layoutImg','scaffImg','aerialImg'];
+var GD_IMG_ARRAY_FIELDS = ['propertyPhotos']; // arrays of base64 images
 var GD_IMG_PLACEHOLDER = '__IN_DRIVE__';
 
 function persistJobs() {
@@ -2100,6 +2165,13 @@ function persistJobs() {
       var slim = JOBS.map(function(j){
         var c = Object.assign({}, j);
         GD_IMG_FIELDS.forEach(function(f){ if(c[f] && c[f] !== GD_IMG_PLACEHOLDER) c[f] = GD_IMG_PLACEHOLDER; });
+        // Array image fields (e.g. propertyPhotos): replace with a marker that records
+        // the count, so the cache stays tiny but we know Drive holds N real images.
+        GD_IMG_ARRAY_FIELDS.forEach(function(f){
+          if(Array.isArray(c[f]) && c[f].length && c[f][0] !== GD_IMG_PLACEHOLDER){
+            c[f] = [GD_IMG_PLACEHOLDER, c[f].length];
+          }
+        });
         return c;
       });
       localStorage.setItem('gguk_v9_jobs', JSON.stringify(slim));
@@ -2246,7 +2318,11 @@ async function gdPush() {
     // SAFETY: if any in-memory job carries an image placeholder (can happen when the
     // app booted from a trimmed localStorage cache before a pull), restore the real
     // image from the current Drive copy so we never overwrite a real image with a marker.
-    if(fid && JOBS.some(function(j){return GD_IMG_FIELDS.some(function(f){return j[f]===GD_IMG_PLACEHOLDER;});})){
+    const hasPlaceholder=function(j){
+      if(GD_IMG_FIELDS.some(function(f){return j[f]===GD_IMG_PLACEHOLDER;})) return true;
+      return GD_IMG_ARRAY_FIELDS.some(function(f){return Array.isArray(j[f])&&j[f][0]===GD_IMG_PLACEHOLDER;});
+    };
+    if(fid && JOBS.some(hasPlaceholder)){
       try{
         const cr=await fetch('https://www.googleapis.com/drive/v3/files/'+fid+'?alt=media',
           {headers:{Authorization:'Bearer '+GD_TOKEN}});
@@ -2256,7 +2332,9 @@ async function gdPush() {
           (cloudData.jobs||[]).forEach(function(cj){cloudById[cj.id]=cj;});
           JOBS.forEach(function(j){
             const cj=cloudById[j.id];
-            if(cj)GD_IMG_FIELDS.forEach(function(f){if(j[f]===GD_IMG_PLACEHOLDER&&cj[f]&&cj[f]!==GD_IMG_PLACEHOLDER)j[f]=cj[f];});
+            if(!cj) return;
+            GD_IMG_FIELDS.forEach(function(f){if(j[f]===GD_IMG_PLACEHOLDER&&cj[f]&&cj[f]!==GD_IMG_PLACEHOLDER)j[f]=cj[f];});
+            GD_IMG_ARRAY_FIELDS.forEach(function(f){if(Array.isArray(j[f])&&j[f][0]===GD_IMG_PLACEHOLDER&&Array.isArray(cj[f])&&cj[f][0]!==GD_IMG_PLACEHOLDER)j[f]=cj[f];});
           });
         }
       }catch(e){}
@@ -2431,8 +2509,8 @@ function autoSelectScaffByArea(jobAddr) {
 function draftBookingEmail(){
   saveJob();
   var name=J.name||'[Customer]';
-  var opts={weekday:'long',day:'numeric',month:'long',year:'numeric'};
-  var opts2={weekday:'long',day:'numeric',month:'long'};
+  var opts={day:'numeric',month:'long',year:'numeric'};
+  var opts2={day:'numeric',month:'long'};
   var installStart=J.start?new Date(J.start+'T12:00:00').toLocaleDateString('en-GB',opts):'[start date]';
   var installEnd=J.end?new Date(J.end+'T12:00:00').toLocaleDateString('en-GB',opts):'[end date]';
   var scaffMonday=J.scafUp?new Date(J.scafUp+'T12:00:00').toLocaleDateString('en-GB',opts2):'[scaffold up date]';
@@ -2596,6 +2674,7 @@ function fillForm() {
   // Restore scaff preview
   const scaffPrev = gel('scaff-preview');
   if(scaffPrev && J.scaffImg) { scaffPrev.src=J.scaffImg; scaffPrev.style.display='block'; }
+  try{ ppRender(); }catch(e){}
   updatePinBar();
 }
 
@@ -2911,6 +2990,11 @@ function spInit() {
     const old=J.spGrid||[];
     J.spGrid=Array.from({length:rows},(_,r)=>Array.from({length:cols},(_,c)=>(old[r]&&old[r][c]!==undefined)?old[r][c]:null));
   }
+  // Orientation grid mirrors spGrid dimensions ('P'=portrait default, 'L'=landscape)
+  if(!J.spOrient||J.spOrient.length!==rows||(J.spOrient[0]&&J.spOrient[0].length!==cols)){
+    const oldO=J.spOrient||[];
+    J.spOrient=Array.from({length:rows},(_,r)=>Array.from({length:cols},(_,c)=>(oldO[r]&&oldO[r][c]!==undefined)?oldO[r][c]:'P'));
+  }
 }
 
 function renderSP() {
@@ -2995,7 +3079,10 @@ function renderSP() {
       const palEntry=cid?PAL.find(p=>p.id===cid):null;
       const str=cid?strs.find(s=>s.pal.id===cid):null;
       const lbl=str?str.short:'';
-      html+=`<td class="sp-cell${palEntry?'':' empty'}" style="${palEntry?'background:'+palEntry.hex:''}" data-r="${r}" data-c="${c}"><div class="sp-lbl">${lbl}</div></td>`;
+      const ori=(J.spOrient&&J.spOrient[r]&&J.spOrient[r][c])||'P';
+      const oriCls=cid?(ori==='L'?' sp-land':' sp-port'):'';
+      const oriGlyph=cid?(ori==='L'?'▭':'▯'):'';
+      html+=`<td class="sp-cell${palEntry?'':' empty'}${oriCls}" style="${palEntry?'background:'+palEntry.hex:''}" data-r="${r}" data-c="${c}"><div class="sp-lbl">${lbl}</div><div class="sp-ori">${oriGlyph}</div></td>`;
     }
     html+='</tr>';
   }
@@ -3012,20 +3099,43 @@ document.addEventListener('mouseup',()=>{ SP_PAINTING=false; });
 
 function spPaint(r,c,forceErase){
   if(!J.spGrid||!J.spGrid[r]) return;
+  if(!J.spOrient) spInit();
+  // Orientation mode: clicking a panel flips it portrait <-> landscape (no colour change).
+  if(SP_ORIENT_MODE && !forceErase){
+    if(J.spGrid[r][c]){ // only orient actual panels
+      J.spOrient[r][c] = (J.spOrient[r][c]==='L') ? 'P' : 'L';
+      spRenderCell(r,c);
+      saveJob();
+    }
+    return;
+  }
   if(SP_ERASE||forceErase){ J.spGrid[r][c]=null; }
-  else if(SP_COLOR){ J.spGrid[r][c]=J.spGrid[r][c]===SP_COLOR?null:SP_COLOR; }
-  // Fast update just that cell
+  else if(SP_COLOR){
+    const was=J.spGrid[r][c];
+    J.spGrid[r][c]=was===SP_COLOR?null:SP_COLOR;
+    // Newly-painted panel takes the current default orientation
+    if(J.spGrid[r][c] && !was){ J.spOrient[r][c]=SP_DEFAULT_ORIENT; }
+  }
+  spRenderCell(r,c);
+  spUpdateTrackerAndSummary();
+}
+
+// Re-render a single grid cell (colour, string label, orientation glyph)
+function spRenderCell(r,c){
   const table=gel('sp-table');
-  const td=table?.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
+  const td=table&&table.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
   if(!td) return;
   const cid=J.spGrid[r][c];
   const palEntry=cid?PAL.find(p=>p.id===cid):null;
   const strs=allStrings();
   const str=cid?strs.find(s=>s.pal.id===cid):null;
-  td.className='sp-cell'+(palEntry?'':' empty');
+  const ori=(J.spOrient&&J.spOrient[r]&&J.spOrient[r][c])||'P';
+  td.className='sp-cell'+(palEntry?'':' empty')+(cid?(ori==='L'?' sp-land':' sp-port'):'');
   td.style.background=palEntry?palEntry.hex:'';
-  td.querySelector('.sp-lbl').textContent=str?str.short:'';
-  spUpdateTrackerAndSummary();
+  const lbl=td.querySelector('.sp-lbl');
+  if(lbl) lbl.textContent=str?str.short:'';
+  const g=td.querySelector('.sp-ori');
+  if(g) g.textContent=cid?(ori==='L'?'▭':'▯'):'';
 }
 
 function spUpdateTrackerAndSummary(){
@@ -3073,6 +3183,229 @@ function spAutoFill(){
   let idx=0;
   for(let r=0;r<J.spRows;r++) for(let c=0;c<J.spCols;c++){J.spGrid[r][c]=strs[idx%strs.length].pal.id;idx++;}
   renderSP();
+}
+
+// ── Orientation mode ──────────────────────────────────────────
+function spToggleOrientMode(){
+  SP_ORIENT_MODE=!SP_ORIENT_MODE;
+  if(SP_ORIENT_MODE){ SP_ERASE=false; }
+  const btn=gel('sp-orient-btn'); if(btn) btn.classList.toggle('sp-orient-on',SP_ORIENT_MODE);
+  const hint=gel('sp-orient-hint'); if(hint) hint.style.display=SP_ORIENT_MODE?'block':'none';
+  renderSP();
+}
+
+// ════════════════════════════════════════════════════════════
+// AUTO STRING PLAN — detect panels from a proposal screenshot,
+// group by roof face, and assign strings within inverter limits.
+// Always shown to the user as a draft to confirm — never silent.
+// ════════════════════════════════════════════════════════════
+var SP_AUTO = null; // { groups:[{panels:[{x,y,w,h}], orient, rows, cols}], totalPanels, imgW, imgH }
+
+function spAutoFromFiles(files){
+  if(!files||!files.length) return;
+  var file=Array.prototype.slice.call(files).find(function(f){return f&&f.type&&f.type.indexOf('image/')===0;});
+  if(!file){ spAutoStatus('That doesn\u2019t look like an image — try a PNG/JPG screenshot.',true); return; }
+  var reader=new FileReader();
+  reader.onload=function(e){ spAutoDetect(e.target.result); };
+  reader.readAsDataURL(file);
+}
+function spAutoDrop(ev){ ev.preventDefault(); var dt=ev.dataTransfer; if(dt&&dt.files&&dt.files.length) spAutoFromFiles(dt.files); }
+function spAutoPaste(ev){
+  var items=(ev.clipboardData||window.clipboardData)&&(ev.clipboardData||window.clipboardData).items; if(!items) return;
+  for(var i=0;i<items.length;i++){ if(items[i].type&&items[i].type.indexOf('image/')===0){ var f=items[i].getAsFile(); if(f){ ev.preventDefault(); spAutoFromFiles([f]); return; } } }
+}
+function spAutoStatus(msg,warn){ var el=gel('sp-auto-status'); if(el){ el.textContent=msg; el.style.color=warn?'var(--red)':'var(--ink3)'; } }
+
+// Detect dark panel rectangles on a lighter roof via connected-component
+// analysis of a downscaled brightness map. Returns candidate boxes.
+function spAutoDetect(dataUrl){
+  spAutoStatus('Analysing screenshot…');
+  var prev=gel('sp-auto-preview'); if(prev){ prev.src=dataUrl; prev.style.display='block'; }
+  var img=new Image();
+  img.onload=function(){
+    try{
+      // Downscale for speed
+      var W=img.width,H=img.height,scale=Math.min(1,720/Math.max(W,H));
+      var w=Math.max(1,Math.round(W*scale)), h=Math.max(1,Math.round(H*scale));
+      var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      var cx=cv.getContext('2d',{willReadFrequently:true}); cx.drawImage(img,0,0,w,h);
+      var data=cx.getImageData(0,0,w,h).data;
+      // Brightness map + Otsu-ish threshold (panels darker than roof)
+      var lum=new Float32Array(w*h), sum=0;
+      for(var i=0,p=0;i<data.length;i+=4,p++){ var L=0.299*data[i]+0.587*data[i+1]+0.114*data[i+2]; lum[p]=L; sum+=L; }
+      var mean=sum/(w*h);
+      var thresh=mean*0.72; // dark = below ~72% of mean brightness
+      var mask=new Uint8Array(w*h);
+      for(var q=0;q<lum.length;q++) mask[q]=lum[q]<thresh?1:0;
+      // Connected components (4-neighbour) via flood fill
+      var labels=new Int32Array(w*h).fill(0), boxes=[], lab=0, stack=[];
+      for(var y=0;y<h;y++)for(var x=0;x<w;x++){
+        var idx=y*w+x;
+        if(mask[idx]&&!labels[idx]){
+          lab++; stack.length=0; stack.push(idx); labels[idx]=lab;
+          var minx=x,maxx=x,miny=y,maxy=y,area=0;
+          while(stack.length){
+            var cur=stack.pop(), cy=(cur/w)|0, cx2=cur-cy*w; area++;
+            if(cx2<minx)minx=cx2; if(cx2>maxx)maxx=cx2; if(cy<miny)miny=cy; if(cy>maxy)maxy=cy;
+            var nb=[cur-1,cur+1,cur-w,cur+w];
+            for(var n=0;n<4;n++){ var nn=nb[n];
+              if(nn>=0&&nn<mask.length){ var ny=(nn/w)|0, nx=nn-ny*w;
+                if(Math.abs(nx-cx2)+Math.abs(ny-cy)===1 && mask[nn] && !labels[nn]){ labels[nn]=lab; stack.push(nn); } } }
+          }
+          var bw=maxx-minx+1, bh=maxy-miny+1;
+          boxes.push({x:minx,y:miny,w:bw,h:bh,area:area,fill:area/(bw*bh)});
+        }
+      }
+      // Filter to panel-like boxes: reasonable size, roughly rectangular, solid fill
+      var areaPx=w*h;
+      var cand=boxes.filter(function(b){
+        var ar=b.w/b.h; var relArea=(b.w*b.h)/areaPx;
+        return relArea>0.0006 && relArea<0.12 && b.fill>0.55 && ar>0.25 && ar<4.0;
+      });
+      if(cand.length<2){ spAutoStatus('Couldn\u2019t confidently detect panels in this image. Use the grid below to place them manually, or try a clearer screenshot.',true); SP_AUTO=null; spAutoActions(false); return; }
+      // Median panel size → normalise oversized blobs (merged panels) into counts
+      var ws=cand.map(function(b){return b.w;}).sort(function(a,b){return a-b;});
+      var hs=cand.map(function(b){return b.h;}).sort(function(a,b){return a-b;});
+      var mw=ws[Math.floor(ws.length/2)], mh=hs[Math.floor(hs.length/2)];
+      // Cluster into roof faces by grouping boxes that share alignment (rows/cols).
+      // Simple approach: cluster by proximity + dominant orientation per cluster.
+      var groups=spClusterFaces(cand,mw,mh);
+      var total=groups.reduce(function(a,g){return a+g.count;},0);
+      SP_AUTO={groups:groups,totalPanels:total,imgW:w,imgH:h,medW:mw,medH:mh};
+      var faceDesc=groups.map(function(g,i){return 'Face '+(i+1)+': '+g.count+' ('+(g.orient==='L'?'landscape':'portrait')+')';}).join(' · ');
+      spAutoStatus('Detected ~'+total+' panels in '+groups.length+' roof face'+(groups.length>1?'s':'')+'. '+faceDesc+'. Confirm or adjust below.');
+      spAutoActions(true);
+    }catch(err){
+      console.error('[spAutoDetect]',err);
+      spAutoStatus('Detection failed on this image — please use the manual grid.',true);
+      SP_AUTO=null; spAutoActions(false);
+    }
+  };
+  img.onerror=function(){ spAutoStatus('Could not read that image.',true); };
+  img.src=dataUrl;
+}
+
+// Cluster candidate boxes into roof faces. Boxes on the same face tend to
+// align in a regular grid; different faces are separated by gaps or differing
+// panel orientation. Returns [{count, orient, rows, cols, boxes}].
+function spClusterFaces(boxes, mw, mh){
+  // Sort by position
+  boxes=boxes.slice().sort(function(a,b){return a.y-b.y||a.x-b.x;});
+  // Assign each box an orientation from its own aspect ratio
+  boxes.forEach(function(b){ b.orient=(b.w/b.h)>=1.15?'L':'P'; });
+  // Greedy spatial clustering: a box joins a cluster if it's within ~1.6 panel
+  // widths of any member AND shares the cluster's dominant orientation.
+  var clusters=[];
+  boxes.forEach(function(b){
+    var best=null,bestD=Infinity;
+    clusters.forEach(function(cl){
+      if(cl.orient!==b.orient) return;
+      for(var k=0;k<cl.boxes.length;k++){
+        var o=cl.boxes[k];
+        var dx=Math.abs((b.x+b.w/2)-(o.x+o.w/2)), dy=Math.abs((b.y+b.h/2)-(o.y+o.h/2));
+        if(dx<mw*1.8 && dy<mh*1.8){ var d=dx+dy; if(d<bestD){bestD=d;best=cl;} }
+      }
+    });
+    if(best){ best.boxes.push(b); }
+    else clusters.push({orient:b.orient,boxes:[b]});
+  });
+  // Merge tiny clusters (1 box) into nearest bigger one if close
+  clusters=clusters.filter(function(c){return c.boxes.length>=1;});
+  // Build group descriptors: estimate rows/cols from box centres
+  return clusters.map(function(cl){
+    var xs=cl.boxes.map(function(b){return b.x+b.w/2;});
+    var ys=cl.boxes.map(function(b){return b.y+b.h/2;});
+    var cols=spEstimateLines(xs,mw), rows=spEstimateLines(ys,mh);
+    var count=cl.boxes.length;
+    // If blobs merged, count can under-read; keep detected count as-is (user can adjust)
+    return {count:count, orient:cl.orient, rows:Math.max(1,rows), cols:Math.max(1,cols), boxes:cl.boxes};
+  }).sort(function(a,b){return b.count-a.count;});
+}
+// Estimate number of distinct grid lines along one axis from centre positions.
+function spEstimateLines(vals,spacing){
+  if(!vals.length) return 1;
+  vals=vals.slice().sort(function(a,b){return a-b;});
+  var lines=1;
+  for(var i=1;i<vals.length;i++){ if(vals[i]-vals[i-1] > spacing*0.6) lines++; }
+  return lines;
+}
+
+function spAutoActions(show){ var el=gel('sp-auto-actions'); if(el) el.style.display=show?'flex':'none'; }
+function spAutoAdjust(delta){
+  if(!SP_AUTO) return;
+  // Adjust the largest face's count (most likely to be mis-read)
+  var g=SP_AUTO.groups[0]; if(!g) return;
+  g.count=Math.max(1,g.count+delta);
+  SP_AUTO.totalPanels=SP_AUTO.groups.reduce(function(a,x){return a+x.count;},0);
+  spAutoStatus('Adjusted — now ~'+SP_AUTO.totalPanels+' panels total across '+SP_AUTO.groups.length+' face'+(SP_AUTO.groups.length>1?'s':'')+'. (Adjusts the largest face.)');
+}
+function spAutoDismiss(){ SP_AUTO=null; spAutoActions(false); spAutoStatus('Auto-detect cancelled — build the plan manually on the grid below.'); }
+
+// Turn the confirmed detection into an actual grid + string assignment.
+function spAutoApply(){
+  if(!SP_AUTO||!SP_AUTO.groups.length){ spAutoStatus('Nothing to apply.',true); return; }
+  var groups=SP_AUTO.groups;
+  // Lay faces out as horizontal bands: total rows = sum of face rows (+1 gap),
+  // total cols = max face cols. Each face keeps its own orientation.
+  var totalPanels=groups.reduce(function(a,g){return a+g.count;},0);
+  // Recompute a sensible rows/cols per face from its count if estimate looks off
+  groups.forEach(function(g){
+    if(g.rows*g.cols < g.count || g.rows*g.cols > g.count*2){
+      g.cols=Math.min(g.count,Math.max(1,Math.round(Math.sqrt(g.count* (g.orient==='L'?0.6:1.6)))));
+      g.rows=Math.ceil(g.count/g.cols);
+    }
+  });
+  var gridCols=Math.max.apply(null,groups.map(function(g){return g.cols;}));
+  var gridRows=groups.reduce(function(a,g){return a+g.rows;},0)+(groups.length-1); // 1 blank row between faces
+  gridCols=Math.min(30,Math.max(1,gridCols)); gridRows=Math.min(20,Math.max(1,gridRows));
+  // Resize the grid
+  var colsEl=gel('sp-cols'), rowsEl=gel('sp-rows');
+  if(colsEl) colsEl.value=gridCols; if(rowsEl) rowsEl.value=gridRows;
+  J.spGrid=null; J.spOrient=null; spInit();
+  // Compute strings: allocate the inverter's available strings across faces,
+  // proportional to panel count (min 1 per face) so different roof faces never
+  // share a string; then split each face as evenly as possible (longest first).
+  var strs=allStrings();
+  var maxStrings=strs.length||J.inverters.reduce(function(a,i){return a+(parseInt(i.strings)||1);},0)||1;
+  var F=groups.length;
+  var alloc=groups.map(function(g){return {g:g, strings:1};});
+  var extraStrings=Math.max(0, maxStrings-F);
+  while(extraStrings>0){
+    var best=-1,bestVal=-1;
+    for(var ai=0;ai<alloc.length;ai++){ var v=alloc[ai].g.count/alloc[ai].strings; if(v>bestVal){bestVal=v;best=ai;} }
+    alloc[best].strings++; extraStrings--;
+  }
+  var stringSeq=[]; // {face, orient, n}
+  alloc.forEach(function(a,fi){
+    var n=a.g.count, s=a.strings, base=Math.floor(n/s), rem=n%s;
+    for(var k=0;k<s;k++){ var take=base+(k<rem?1:0); if(take>0) stringSeq.push({face:fi,orient:a.g.orient,n:take}); }
+  });
+  var usedStrings=stringSeq.length;
+  var perStringCap=Math.max.apply(null, stringSeq.map(function(s){return s.n;}));
+  // Paint into the grid, face by face as horizontal bands
+  var rowCursor=0;
+  groups.forEach(function(g,fi){
+    var faceStrings=stringSeq.map(function(s,i){return {i:i,s:s};}).filter(function(o){return o.s.face===fi;});
+    var panelsLeft=g.count, faceStrIdx=0, inThisStr=0;
+    for(var rr=0; rr<g.rows && panelsLeft>0; rr++){
+      for(var cc=0; cc<g.cols && panelsLeft>0; cc++){
+        var gr=rowCursor+rr;
+        if(gr>=J.spRows) break;
+        var cur=faceStrings[faceStrIdx];
+        if(!cur){ break; }
+        var palId=PAL[(cur.i)%PAL.length].id;
+        if(cc<J.spCols){ J.spGrid[gr][cc]=palId; J.spOrient[gr][cc]=g.orient; }
+        panelsLeft--; inThisStr++;
+        if(inThisStr>=cur.s.n){ faceStrIdx++; inThisStr=0; }
+      }
+    }
+    rowCursor+=g.rows+1; // gap row between faces
+  });
+  renderSP(); saveJob();
+  var msg='Built '+usedStrings+' string'+(usedStrings>1?'s':'')+' across '+groups.length+' roof face'+(groups.length>1?'s':'')+' (max '+perStringCap+' panels/string).';
+  if(usedStrings>maxStrings) msg+=' ⚠ This needs '+usedStrings+' strings but your inverter setup only defines '+maxStrings+' — add MPPT strings on the Equipment step, or the faces won\u2019t all fit.';
+  spAutoStatus(msg);
+  spAutoActions(false);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -4106,8 +4439,11 @@ async function generatePack(type) {
       {fn:'02_SPV_Panel_Layout',    icon:'☀️',  label:'SPV Panel Layout Plan',         html:htmlSPVPlan(J)},
       {fn:'03_String_Plan',         icon:'🔌', label:'String Plan',                   html:htmlStringPlan(J)},
       {fn:'04_Scaffold_Plan',       icon:'🏗',  label:'Scaffold Plan',                 html:htmlScaffPlan(J)},
-      {fn:'05_Risk_Assessment',     icon:'⚠️',  label:'Risk Assessment',               html:htmlRisk(J)},
-      {fn:'06_Method_Statement',    icon:'📄', label:'Method Statement',              html:htmlMethod(J)},
+      ...((Array.isArray(J.propertyPhotos)&&J.propertyPhotos.length&&J.propertyPhotos[0]!==GD_IMG_PLACEHOLDER) ? [
+      {fn:'05_Property_Photos',     icon:'📸', label:'Property Photos',               html:htmlPropertyPhotos(J)}
+      ] : []),
+      {fn:'06_Risk_Assessment',     icon:'⚠️',  label:'Risk Assessment',               html:htmlRisk(J)},
+      {fn:'07_Method_Statement',    icon:'📄', label:'Method Statement',              html:htmlMethod(J)},
     ] : [
       {fn:'01_Workmanship_Warranty',icon:'✅', label:'Workmanship Warranty (2yr)',    html:htmlWorkmanshipWarranty(J)},
       {fn:'02_G99_Form_A3-1',       icon:'📝', label:'G99 Form A3-1',                 html:htmlG99(J)},
@@ -4513,6 +4849,97 @@ function handleSitePhoto(input, key) {
     J.scaffName=file.name;
     if(labelEl) labelEl.textContent='✓ '+file.name+' (PDF — will reference in doc)';
   }
+}
+
+// ════════════════════════════════════════════════════════════
+// PROPERTY PHOTOS — drag/drop/paste, downscaled, shown on scaffold plan + job pack
+// ════════════════════════════════════════════════════════════
+var PP_MAX = 20;         // max photos per job
+var PP_MAX_DIM = 1600;   // longest edge (px) — downscale bigger images
+var PP_JPEG_Q = 0.82;    // JPEG quality for stored copy
+
+// Downscale a base64/File image to a reasonable JPEG to keep payloads sane.
+function ppDownscale(dataUrl){
+  return new Promise(function(resolve){
+    try{
+      var img=new Image();
+      img.onload=function(){
+        var w=img.width, h=img.height;
+        if(Math.max(w,h)>PP_MAX_DIM){
+          var s=PP_MAX_DIM/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s);
+        }
+        var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+        var cx=cv.getContext('2d'); cx.drawImage(img,0,0,w,h);
+        try{ resolve(cv.toDataURL('image/jpeg',PP_JPEG_Q)); }
+        catch(e){ resolve(dataUrl); } // tainted canvas etc → keep original
+      };
+      img.onerror=function(){ resolve(dataUrl); };
+      img.src=dataUrl;
+    }catch(e){ resolve(dataUrl); }
+  });
+}
+
+function ppAddFiles(files){
+  if(!files||!files.length) return;
+  if(!Array.isArray(J.propertyPhotos)) J.propertyPhotos=[];
+  var list=Array.prototype.slice.call(files).filter(function(f){return f && f.type && f.type.indexOf('image/')===0;});
+  if(!list.length) return;
+  var room=PP_MAX-J.propertyPhotos.length;
+  if(room<=0){ alert('You already have the maximum of '+PP_MAX+' property photos. Remove some first.'); return; }
+  if(list.length>room){ alert('Only room for '+room+' more photo(s) — adding the first '+room+'.'); list=list.slice(0,room); }
+  var done=0;
+  list.forEach(function(file){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      ppDownscale(e.target.result).then(function(scaled){
+        J.propertyPhotos.push(scaled);
+        done++;
+        if(done===list.length){ ppRender(); saveJob(); }
+        else ppRender();
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function ppDrop(ev){
+  ev.preventDefault();
+  var dt=ev.dataTransfer; if(!dt) return;
+  if(dt.files && dt.files.length){ ppAddFiles(dt.files); }
+}
+
+function ppPaste(ev){
+  var items=(ev.clipboardData||window.clipboardData)&&(ev.clipboardData||window.clipboardData).items;
+  if(!items) return;
+  var imgs=[];
+  for(var i=0;i<items.length;i++){ if(items[i].type&&items[i].type.indexOf('image/')===0){ var f=items[i].getAsFile(); if(f) imgs.push(f); } }
+  if(imgs.length){ ev.preventDefault(); ppAddFiles(imgs); }
+}
+
+function ppRemove(i){
+  if(!Array.isArray(J.propertyPhotos)) return;
+  J.propertyPhotos.splice(i,1);
+  ppRender(); saveJob();
+}
+
+function ppRender(){
+  var grid=gel('pp-grid'); var cnt=gel('pp-count');
+  if(!grid) return;
+  var photos=Array.isArray(J.propertyPhotos)?J.propertyPhotos:[];
+  // If cache was trimmed, photos may be a marker [placeholder,count] — show a notice.
+  if(photos[0]===GD_IMG_PLACEHOLDER){
+    grid.innerHTML='';
+    if(cnt) cnt.textContent='📷 '+(photos[1]||'?')+' photo(s) stored in Drive — reopen after sync to view/edit.';
+    return;
+  }
+  grid.innerHTML=photos.map(function(src,i){
+    return '<div style="position:relative;aspect-ratio:1;border:1px solid var(--bdr);border-radius:8px;overflow:hidden;background:#000">'
+      +'<img src="'+src+'" style="width:100%;height:100%;object-fit:cover;display:block">'
+      +'<button onclick="ppRemove('+i+')" title="Remove" style="position:absolute;top:3px;right:3px;width:22px;height:22px;border:none;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>'
+      +'<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);color:#fff;font-size:9px;text-align:center;padding:1px 0">'+(i+1)+'</div>'
+      +'</div>';
+  }).join('');
+  if(cnt) cnt.textContent=photos.length?(photos.length+' photo'+(photos.length>1?'s':'')+' · shown on the scaffold plan and in a Property Photos page of the job pack'):'';
 }
 
 
@@ -5829,7 +6256,9 @@ function htmlSPVPlan(j) {
         const pal=cid?PAL.find(p=>p.id===cid):null;
         const strObj=pal?strs.find(s=>s.pal&&s.pal.id===cid):null;
         const label=strObj?strObj.short:'';
-        gridHtml+=`<td style="border:1px solid #999;padding:3px;text-align:center;background:${pal?pal.hex:'#fff'};min-width:${cw}px;height:20px;font-size:7.5pt;font-weight:700">${label}</td>`;
+        const ori=(j.spOrient&&j.spOrient[r]&&j.spOrient[r][c])||'P';
+        const oriGlyph=cid?`<span style="font-size:6.5pt;color:#333"> ${ori==='L'?'▭':'▯'}</span>`:'';
+        gridHtml+=`<td style="border:1px solid #999;padding:3px;text-align:center;background:${pal?pal.hex:'#fff'};min-width:${cw}px;height:20px;font-size:7.5pt;font-weight:700">${label}${oriGlyph}</td>`;
       }
       gridHtml += '</tr>';
     }
@@ -5947,6 +6376,26 @@ function htmlStringPlan(j) {
     </div>`;
 }
 
+// Build a print-friendly grid of property photos (used on scaffold plan + job pack).
+// Skips gracefully if photos are absent or only a Drive placeholder is present.
+function ppPhotoGridHtml(j, opts){
+  opts = opts || {};
+  const photos = Array.isArray(j.propertyPhotos) ? j.propertyPhotos : [];
+  if(!photos.length || photos[0]===GD_IMG_PLACEHOLDER) return '';
+  const cols = opts.cols || 2;
+  const maxH = opts.maxH || '75mm';
+  const cells = photos.map(function(src,i){
+    return `<td style="width:${Math.floor(100/cols)}%;padding:2mm;vertical-align:top;text-align:center">
+      <img src="${src}" style="max-width:100%;max-height:${maxH};border:1px solid #999;display:block;margin:0 auto">
+      <div style="font-size:7.5pt;color:#666;margin-top:1mm">Photo ${i+1}</div></td>`;
+  });
+  let rows='';
+  for(let i=0;i<cells.length;i+=cols){
+    rows += '<tr>'+cells.slice(i,i+cols).join('')+'</tr>';
+  }
+  return `<table style="width:100%;border-collapse:collapse;margin:2mm 0">${rows}</table>`;
+}
+
 // ── SCAFFOLD PLAN — matches 10039-_Scaff_Plan.docx exactly ──
 function htmlScaffPlan(j) {
   const scaffPhoto = j.scaffImg
@@ -5979,9 +6428,30 @@ function htmlScaffPlan(j) {
 
     ${scaffPhoto}
 
+    ${ppPhotoGridHtml(j,{cols:2,maxH:'70mm'}) ? `
+    <div style="background:#375623;color:#fff;font-weight:bold;padding:4pt 8pt;margin:4mm 0 2mm">Property Photos:</div>
+    ${ppPhotoGridHtml(j,{cols:2,maxH:'70mm'})}` : ''}
+
     <div class="footer-doc">
       <span>Scaffold Plan · GreenGenUK Limited · MCS NIC1909</span>
       <span>Ref: ${esc(j.ref||'')} – Scaff Plan · Printed: ${new Date().toLocaleDateString('en-GB')}</span>
+    </div>`;
+}
+
+// ── PROPERTY PHOTOS — dedicated job-pack page ──
+function htmlPropertyPhotos(j) {
+  const grid = ppPhotoGridHtml(j,{cols:2,maxH:'110mm'});
+  const body = grid || `<div style="border:2px dashed #ccc;height:120mm;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:10pt;margin:3mm 0">No property photos added — add them via the app (Customer &amp; site → Property photos)</div>`;
+  return ggukDocHeader('Property Photos', j.ref) + `
+    <div style="background:#0369a1;color:#fff;font-weight:bold;font-size:12pt;padding:6pt 10pt;text-align:center;margin-bottom:4mm">PROPERTY PHOTOS</div>
+    <table class="bdr-all" style="margin-bottom:3mm">
+      <tr><td class="hdr" style="width:25%">Address</td><td>${esc([j.a1,j.a2,j.a3,j.pc].filter(Boolean).join(', '))}</td></tr>
+      <tr><td class="hdr">Ref</td><td><strong>${esc(j.ref||'')}</strong></td></tr>
+    </table>
+    ${body}
+    <div class="footer-doc">
+      <span>Property Photos · GreenGenUK Limited · MCS NIC1909</span>
+      <span>Ref: ${esc(j.ref||'')} — Property Photos · Printed: ${new Date().toLocaleDateString('en-GB')}</span>
     </div>`;
 }
 
@@ -7684,6 +8154,7 @@ load();
         layoutImg: ex.layoutImg || fresh.layoutImg,
         scaffImg: ex.scaffImg || fresh.scaffImg,
         aerialImg: ex.aerialImg || fresh.aerialImg,
+        propertyPhotos: (ex.propertyPhotos && ex.propertyPhotos.length) ? ex.propertyPhotos : (fresh.propertyPhotos||[]),
         enaRefs: ex.enaRefs || fresh.enaRefs,
         mondayItemId: ex.mondayItemId || fresh.mondayItemId,
         spGrid: ex.spGrid || fresh.spGrid,
