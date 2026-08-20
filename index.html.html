@@ -157,6 +157,9 @@ select.ei{cursor:pointer}
 .sp-cell.sp-land{box-shadow:inset 0 0 0 2px rgba(0,0,0,.28)}
 .sp-cell.sp-port{box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
 .sp-orient-on{background:var(--grn-l)!important;color:var(--grn)!important;border-color:var(--grn-m)!important}
+.btn-blue{background:var(--blue,#2563eb);color:#fff;border-color:transparent}
+.btn-blue:hover{filter:brightness(1.06)}
+.sp-mm-mode.sp-mm-on{background:var(--grn-l);color:var(--grn);border-color:var(--grn-m)}
 .sp-tracker{border-collapse:collapse;font-size:12px}
 .sp-tracker td,.sp-tracker th{border:1px solid #9ca3af;padding:5px 9px;text-align:center;min-width:72px}
 .sp-tracker th{background:#dce6f1;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
@@ -803,7 +806,8 @@ select.ei{cursor:pointer}
           <button class="btn btn-green btn-sm" onclick="spAutoApply()">✓ Looks right — build string plan</button>
           <button class="btn btn-ghost btn-sm" onclick="spAutoAdjust(-1)">− Fewer panels</button>
           <button class="btn btn-ghost btn-sm" onclick="spAutoAdjust(1)">+ More panels</button>
-          <button class="btn btn-ghost btn-sm" onclick="spAutoDismiss()">Cancel / do it manually</button>
+          <button class="btn btn-blue btn-sm" onclick="spManualOpen()">✎ Mark manually</button>
+          <button class="btn btn-ghost btn-sm" onclick="spAutoDismiss()">Cancel</button>
         </div>
       </div>
 
@@ -1995,9 +1999,52 @@ Ref 12196 (Jenny Roe) done 16 May, Fox ESS, on time
   </div>
 </div>
 
+<!-- MANUAL PANEL MARKER MODAL -->
+<div class="modal-bg" id="sp-manual-modal" onclick="if(event.target===this)spManualClose()">
+  <div class="modal" style="width:min(960px,97vw);max-width:97vw">
+    <div class="modal-head">
+      <div class="modal-title">Mark panels on the layout</div>
+      <button class="modal-close" onclick="spManualClose()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;font-size:12px">
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="color:var(--ink3)">Mode:</span>
+          <button class="btn btn-ghost btn-xs sp-mm-mode sp-mm-on" id="mm-mode-box" onclick="spManualMode('box')">▭ Box a block</button>
+          <button class="btn btn-ghost btn-xs sp-mm-mode" id="mm-mode-tap" onclick="spManualMode('tap')">＋ Tap panels</button>
+          <button class="btn btn-ghost btn-xs sp-mm-mode" id="mm-mode-del" onclick="spManualMode('del')">🗑 Remove</button>
+        </div>
+        <div class="sp-divider"></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="color:var(--ink3)">Roof face:</span>
+          <select id="mm-face" style="font-size:12px;padding:4px 6px;background:var(--bg);border:1.5px solid var(--bdr2);border-radius:7px"></select>
+          <button class="btn btn-ghost btn-xs" onclick="spManualAddFace()">+ New face</button>
+        </div>
+        <div class="sp-divider"></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="color:var(--ink3)">New panels:</span>
+          <select id="mm-orient" style="font-size:12px;padding:4px 6px;background:var(--bg);border:1.5px solid var(--bdr2);border-radius:7px">
+            <option value="P">Portrait ▯</option><option value="L">Landscape ▭</option>
+          </select>
+        </div>
+      </div>
+      <div style="position:relative;overflow:auto;max-height:56vh;border:1px solid var(--bdr);border-radius:8px;background:#111">
+        <canvas id="mm-canvas" style="display:block;cursor:crosshair;max-width:100%"></canvas>
+      </div>
+      <div id="mm-status" style="font-size:12px;color:var(--ink3);margin-top:8px">Box mode: drag a rectangle around a block of panels — you'll be asked how many rows × columns. Tap mode: click individual panels. Different faces get different strings.</div>
+    </div>
+    <div class="modal-foot" style="justify-content:space-between">
+      <div style="font-size:12px;color:var(--ink2)" id="mm-count">0 panels · 0 faces</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="spManualClose()">Cancel</button>
+        <button class="btn btn-ghost btn-sm" onclick="spManualClear()">Clear all</button>
+        <button class="btn btn-green btn-sm" onclick="spManualApply()">✓ Build string plan</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 
-<script>
 // ════════════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════════════
@@ -2020,7 +2067,7 @@ const BLANK = () => ({
   dnoRef:'',
   mpan:'',
   pVoc:'', pIsc:'',
-  spGrid: null, spOrient: null, spCols:8, spRows:4,
+  spGrid: null, spOrient: null, spCols:8, spRows:4, spLayoutImg: null,
   mondayItemId: null,
   hDate: '', hDno: '',
   enaRefs: {},
@@ -2149,7 +2196,7 @@ async function autoLookupVocIsc(){
 // in full but can overflow the ~5MB localStorage quota. When that happens we cache a
 // slim copy (images replaced with an in-Drive marker) so the local cache still holds
 // every job's data — the full images remain in memory and are synced to Drive by gdPush.
-var GD_IMG_FIELDS = ['layoutImg','scaffImg','aerialImg'];
+var GD_IMG_FIELDS = ['layoutImg','scaffImg','aerialImg','spLayoutImg'];
 var GD_IMG_ARRAY_FIELDS = ['propertyPhotos']; // arrays of base64 images
 var GD_IMG_PLACEHOLDER = '__IN_DRIVE__';
 
@@ -3206,7 +3253,7 @@ function spAutoFromFiles(files){
   var file=Array.prototype.slice.call(files).find(function(f){return f&&f.type&&f.type.indexOf('image/')===0;});
   if(!file){ spAutoStatus('That doesn\u2019t look like an image — try a PNG/JPG screenshot.',true); return; }
   var reader=new FileReader();
-  reader.onload=function(e){ spAutoDetect(e.target.result); };
+  reader.onload=function(e){ J.spLayoutImg=e.target.result; spAutoDetect(e.target.result); };
   reader.readAsDataURL(file);
 }
 function spAutoDrop(ev){ ev.preventDefault(); var dt=ev.dataTransfer; if(dt&&dt.files&&dt.files.length) spAutoFromFiles(dt.files); }
@@ -3216,69 +3263,78 @@ function spAutoPaste(ev){
 }
 function spAutoStatus(msg,warn){ var el=gel('sp-auto-status'); if(el){ el.textContent=msg; el.style.color=warn?'var(--red)':'var(--ink3)'; } }
 
-// Detect dark panel rectangles on a lighter roof via connected-component
-// analysis of a downscaled brightness map. Returns candidate boxes.
+// Connected-components (4-neighbour flood fill) → bounding boxes with fill ratio.
+function spComponents(mask,w,h){
+  var labels=new Int32Array(w*h), boxes=[], lab=0, stack=[];
+  for(var y=0;y<h;y++)for(var x=0;x<w;x++){
+    var idx=y*w+x;
+    if(mask[idx]&&!labels[idx]){
+      lab++; stack.length=0; stack.push(idx); labels[idx]=lab;
+      var minx=x,maxx=x,miny=y,maxy=y,area=0;
+      while(stack.length){
+        var cur=stack.pop(), cy=(cur/w)|0, cx2=cur-cy*w; area++;
+        if(cx2<minx)minx=cx2; if(cx2>maxx)maxx=cx2; if(cy<miny)miny=cy; if(cy>maxy)maxy=cy;
+        var nb=[cur-1,cur+1,cur-w,cur+w];
+        for(var n=0;n<4;n++){ var nn=nb[n];
+          if(nn>=0&&nn<mask.length){ var ny=(nn/w)|0, nx=nn-ny*w;
+            if(Math.abs(nx-cx2)+Math.abs(ny-cy)===1 && mask[nn] && !labels[nn]){ labels[nn]=lab; stack.push(nn); } } }
+      }
+      var bw=maxx-minx+1, bh=maxy-miny+1;
+      boxes.push({x:minx,y:miny,w:bw,h:bh,area:area,fill:area/(bw*bh)});
+    }
+  }
+  return boxes;
+}
+
+// Best-effort panel detection (BETA). Real-world renders vary too much for this
+// to be reliable yet — so results are ALWAYS a draft you confirm, and manual
+// marking is the primary path. Every confirmed layout is saved as training data
+// (spSaveTrainingExample) so the detector can be improved against real examples.
 function spAutoDetect(dataUrl){
-  spAutoStatus('Analysing screenshot…');
+  spAutoStatus('Analysing screenshot… (beta — check the result)');
   var prev=gel('sp-auto-preview'); if(prev){ prev.src=dataUrl; prev.style.display='block'; }
   var img=new Image();
   img.onload=function(){
     try{
-      // Downscale for speed
-      var W=img.width,H=img.height,scale=Math.min(1,720/Math.max(W,H));
+      var W=img.width,H=img.height,scale=Math.min(1,760/Math.max(W,H));
       var w=Math.max(1,Math.round(W*scale)), h=Math.max(1,Math.round(H*scale));
       var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
       var cx=cv.getContext('2d',{willReadFrequently:true}); cx.drawImage(img,0,0,w,h);
       var data=cx.getImageData(0,0,w,h).data;
-      // Brightness map + Otsu-ish threshold (panels darker than roof)
-      var lum=new Float32Array(w*h), sum=0;
-      for(var i=0,p=0;i<data.length;i+=4,p++){ var L=0.299*data[i]+0.587*data[i+1]+0.114*data[i+2]; lum[p]=L; sum+=L; }
-      var mean=sum/(w*h);
-      var thresh=mean*0.72; // dark = below ~72% of mean brightness
-      var mask=new Uint8Array(w*h);
-      for(var q=0;q<lum.length;q++) mask[q]=lum[q]<thresh?1:0;
-      // Connected components (4-neighbour) via flood fill
-      var labels=new Int32Array(w*h).fill(0), boxes=[], lab=0, stack=[];
-      for(var y=0;y<h;y++)for(var x=0;x<w;x++){
-        var idx=y*w+x;
-        if(mask[idx]&&!labels[idx]){
-          lab++; stack.length=0; stack.push(idx); labels[idx]=lab;
-          var minx=x,maxx=x,miny=y,maxy=y,area=0;
-          while(stack.length){
-            var cur=stack.pop(), cy=(cur/w)|0, cx2=cur-cy*w; area++;
-            if(cx2<minx)minx=cx2; if(cx2>maxx)maxx=cx2; if(cy<miny)miny=cy; if(cy>maxy)maxy=cy;
-            var nb=[cur-1,cur+1,cur-w,cur+w];
-            for(var n=0;n<4;n++){ var nn=nb[n];
-              if(nn>=0&&nn<mask.length){ var ny=(nn/w)|0, nx=nn-ny*w;
-                if(Math.abs(nx-cx2)+Math.abs(ny-cy)===1 && mask[nn] && !labels[nn]){ labels[nn]=lab; stack.push(nn); } } }
-          }
-          var bw=maxx-minx+1, bh=maxy-miny+1;
-          boxes.push({x:minx,y:miny,w:bw,h:bh,area:area,fill:area/(bw*bh)});
-        }
+      var N=w*h, lum=new Float32Array(N);
+      var mask=new Uint8Array(N);
+      for(var i=0,p=0;i<data.length;i+=4,p++){
+        var R=data[i],G=data[i+1],B=data[i+2];
+        lum[p]=0.299*R+0.587*G+0.114*B;
+        // Panels: darker + more blue/neutral than a (typically warmer) roof.
+        if(lum[p]<135 && lum[p]>20 && B>=R-4) mask[p]=1;
       }
-      // Filter to panel-like boxes: reasonable size, roughly rectangular, solid fill
-      var areaPx=w*h;
+      var boxes=spComponents(mask,w,h);
+      var areaPx=N;
       var cand=boxes.filter(function(b){
-        var ar=b.w/b.h; var relArea=(b.w*b.h)/areaPx;
-        return relArea>0.0006 && relArea<0.12 && b.fill>0.55 && ar>0.25 && ar<4.0;
+        var ar=b.w/b.h, rel=(b.w*b.h)/areaPx;
+        return rel>0.0005 && rel<0.05 && b.fill>0.55 && ar>0.25 && ar<4.0;
       });
-      if(cand.length<2){ spAutoStatus('Couldn\u2019t confidently detect panels in this image. Use the grid below to place them manually, or try a clearer screenshot.',true); SP_AUTO=null; spAutoActions(false); return; }
-      // Median panel size → normalise oversized blobs (merged panels) into counts
+      SP_AUTO={imgW:w,imgH:h,srcW:W,srcH:H,dataUrl:dataUrl,detectedAt:Date.now()};
+      if(cand.length<3){
+        spAutoStatus('⚠ Auto-detect couldn\u2019t read this render confidently (they vary a lot). Click "Mark manually" to box the blocks and tap odd panels — that\u2019s the reliable route.',true);
+        SP_AUTO.groups=[]; SP_AUTO.boxes=[]; SP_AUTO.detectCount=0;
+        spAutoActions(true); // still show actions incl. manual
+        return;
+      }
       var ws=cand.map(function(b){return b.w;}).sort(function(a,b){return a-b;});
       var hs=cand.map(function(b){return b.h;}).sort(function(a,b){return a-b;});
-      var mw=ws[Math.floor(ws.length/2)], mh=hs[Math.floor(hs.length/2)];
-      // Cluster into roof faces by grouping boxes that share alignment (rows/cols).
-      // Simple approach: cluster by proximity + dominant orientation per cluster.
+      var mw=ws[Math.floor(ws.length/2)]||1, mh=hs[Math.floor(hs.length/2)]||1;
       var groups=spClusterFaces(cand,mw,mh);
       var total=groups.reduce(function(a,g){return a+g.count;},0);
-      SP_AUTO={groups:groups,totalPanels:total,imgW:w,imgH:h,medW:mw,medH:mh};
-      var faceDesc=groups.map(function(g,i){return 'Face '+(i+1)+': '+g.count+' ('+(g.orient==='L'?'landscape':'portrait')+')';}).join(' · ');
-      spAutoStatus('Detected ~'+total+' panels in '+groups.length+' roof face'+(groups.length>1?'s':'')+'. '+faceDesc+'. Confirm or adjust below.');
+      SP_AUTO.groups=groups; SP_AUTO.boxes=cand; SP_AUTO.medW=mw; SP_AUTO.medH=mh; SP_AUTO.detectCount=total;
+      var faceDesc=groups.map(function(g,i){return 'Face '+(i+1)+': '+g.count;}).join(' · ');
+      spAutoStatus('Beta detect: ~'+total+' panels in '+groups.length+' face'+(groups.length>1?'s':'')+' ('+faceDesc+'). Check carefully — confirm, adjust, or mark manually.');
       spAutoActions(true);
     }catch(err){
       console.error('[spAutoDetect]',err);
-      spAutoStatus('Detection failed on this image — please use the manual grid.',true);
-      SP_AUTO=null; spAutoActions(false);
+      spAutoStatus('Detection failed — please mark manually.',true);
+      SP_AUTO={dataUrl:dataUrl}; spAutoActions(true);
     }
   };
   img.onerror=function(){ spAutoStatus('Could not read that image.',true); };
@@ -3409,6 +3465,209 @@ function spAutoApply(){
 }
 
 // ════════════════════════════════════════════════════════════
+// MANUAL PANEL MARKER — box a block / tap odd panels, assign faces.
+// Reliable path when auto-detect isn't clean; also produces training data.
+// ════════════════════════════════════════════════════════════
+var MM = null; // { img, dataUrl, W, H, dispScale, panels:[{cx,cy,face,orient}], faces:[{orient}], mode, curFace, drag }
+
+function spManualOpen(){
+  var dataUrl = (SP_AUTO && SP_AUTO.dataUrl) ? SP_AUTO.dataUrl : (J.spLayoutImg||null);
+  if(!dataUrl){ alert('Upload a panel-layout screenshot first (the drop zone above).'); return; }
+  var img=new Image();
+  img.onload=function(){
+    MM={ img:img, dataUrl:dataUrl, W:img.width, H:img.height, panels:[], faces:[{orient:'P'}], mode:'box', curFace:0, drag:null,
+         detect:(SP_AUTO&&SP_AUTO.detectCount!=null)?{count:SP_AUTO.detectCount,groups:(SP_AUTO.groups||[]).map(function(g){return {count:g.count,orient:g.orient};})}:null };
+    // Pre-seed faces from auto-detect if it produced any (user can edit)
+    gel('sp-manual-modal').classList.add('on');
+    spManualMode('box');
+    spManualRefreshFaces();
+    spManualDraw();
+    spManualStatus();
+  };
+  img.onerror=function(){ alert('Could not load that image.'); };
+  img.src=dataUrl;
+}
+function spManualClose(){ gel('sp-manual-modal').classList.remove('on'); }
+function spManualMode(m){
+  if(!MM) return; MM.mode=m;
+  ['box','tap','del'].forEach(function(k){ var b=gel('mm-mode-'+k); if(b) b.classList.toggle('sp-mm-on',k===m); });
+  var cv=gel('mm-canvas'); if(cv) cv.style.cursor=(m==='del')?'not-allowed':'crosshair';
+}
+function spManualAddFace(){
+  if(!MM) return; MM.faces.push({orient:gel('mm-orient').value||'P'}); MM.curFace=MM.faces.length-1;
+  spManualRefreshFaces(); spManualStatus();
+}
+function spManualRefreshFaces(){
+  var sel=gel('mm-face'); if(!sel||!MM) return;
+  sel.innerHTML=MM.faces.map(function(f,i){return '<option value="'+i+'">Face '+(i+1)+'</option>';}).join('');
+  sel.value=MM.curFace;
+  sel.onchange=function(){ MM.curFace=+this.value; };
+}
+function spManualClear(){ if(!MM)return; if(!confirm('Clear all marked panels?'))return; MM.panels=[]; MM.faces=[{orient:'P'}]; MM.curFace=0; spManualRefreshFaces(); spManualDraw(); spManualStatus(); }
+
+function spManualDraw(){
+  var cv=gel('mm-canvas'); if(!cv||!MM) return;
+  // Fit display width to modal (max 900px), keep aspect
+  var maxW=Math.min(900, (window.innerWidth*0.9)|0);
+  var scale=Math.min(1, maxW/MM.W);
+  MM.dispScale=scale;
+  cv.width=Math.round(MM.W*scale); cv.height=Math.round(MM.H*scale);
+  var cx=cv.getContext('2d');
+  cx.drawImage(MM.img,0,0,cv.width,cv.height);
+  // Draw panels
+  var faceColors=PAL.map(function(p){return p.hex;});
+  MM.panels.forEach(function(pn){
+    var col=faceColors[pn.face%faceColors.length];
+    var s=(pn.orient==='L')?{w:16,h:10}:{w:10,h:16};
+    cx.save();
+    cx.globalAlpha=0.55; cx.fillStyle=col;
+    cx.fillRect(pn.cx*scale-s.w/2, pn.cy*scale-s.h/2, s.w, s.h);
+    cx.globalAlpha=1; cx.strokeStyle='#000'; cx.lineWidth=1;
+    cx.strokeRect(pn.cx*scale-s.w/2, pn.cy*scale-s.h/2, s.w, s.h);
+    cx.restore();
+  });
+  // Draw in-progress drag rectangle
+  if(MM.drag){
+    cx.save(); cx.strokeStyle='#22c55e'; cx.lineWidth=2; cx.setLineDash([5,4]);
+    var d=MM.drag; cx.strokeRect(Math.min(d.x0,d.x1),Math.min(d.y0,d.y1),Math.abs(d.x1-d.x0),Math.abs(d.y1-d.y0));
+    cx.restore();
+  }
+}
+function spManualStatus(){
+  var c=gel('mm-count'); if(c&&MM) c.textContent=MM.panels.length+' panel'+(MM.panels.length!==1?'s':'')+' · '+MM.faces.length+' face'+(MM.faces.length!==1?'s':'');
+}
+
+// Canvas interaction
+document.addEventListener('DOMContentLoaded',function(){
+  var cv=gel('mm-canvas'); if(!cv) return;
+  function pos(e){ var r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left), y:(e.clientY-r.top)}; }
+  cv.addEventListener('mousedown',function(e){
+    if(!MM) return; var p=pos(e);
+    if(MM.mode==='box'){ MM.drag={x0:p.x,y0:p.y,x1:p.x,y1:p.y}; }
+    else if(MM.mode==='tap'){ spManualAddPanel(p.x/MM.dispScale, p.y/MM.dispScale); }
+    else if(MM.mode==='del'){ spManualDeleteNear(p.x/MM.dispScale, p.y/MM.dispScale); }
+  });
+  cv.addEventListener('mousemove',function(e){ if(!MM||!MM.drag)return; var p=pos(e); MM.drag.x1=p.x; MM.drag.y1=p.y; spManualDraw(); });
+  cv.addEventListener('mouseup',function(e){
+    if(!MM||!MM.drag) return;
+    var d=MM.drag; MM.drag=null;
+    var w=Math.abs(d.x1-d.x0), h=Math.abs(d.y1-d.y0);
+    if(w<8||h<8){ spManualDraw(); return; } // too small — ignore
+    spManualBoxBlock(Math.min(d.x0,d.x1)/MM.dispScale, Math.min(d.y0,d.y1)/MM.dispScale, w/MM.dispScale, h/MM.dispScale);
+  });
+});
+function spManualAddPanel(x,y){
+  MM.panels.push({cx:x,cy:y,face:MM.curFace,orient:MM.faces[MM.curFace].orient});
+  spManualDraw(); spManualStatus();
+}
+function spManualDeleteNear(x,y){
+  var best=-1,bd=1e9;
+  MM.panels.forEach(function(pn,i){ var d=(pn.cx-x)*(pn.cx-x)+(pn.cy-y)*(pn.cy-y); if(d<bd){bd=d;best=i;} });
+  if(best>=0 && bd < 900){ MM.panels.splice(best,1); spManualDraw(); spManualStatus(); }
+}
+function spManualBoxBlock(x,y,w,h){
+  // Ask rows × cols for this block
+  var def = (w>h) ? '2 x 6' : '3 x 4';
+  var ans=prompt('How many panels in this block?  Enter as  rows x columns  (e.g. 3 x 8):', def);
+  if(!ans) { spManualDraw(); return; }
+  var m=ans.replace(/[×X]/g,'x').split('x').map(function(s){return parseInt(s.trim());});
+  var rows=m[0], cols=m[1];
+  if(!rows||!cols||rows<1||cols<1){ alert('Please enter like "3 x 8".'); return; }
+  var orient=gel('mm-orient').value||'P';
+  // Place rows×cols evenly inside the drawn box, all in the current face
+  for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
+    var px=x + (c+0.5)*(w/cols);
+    var py=y + (r+0.5)*(h/rows);
+    MM.panels.push({cx:px,cy:py,face:MM.curFace,orient:orient});
+  }
+  spManualDraw(); spManualStatus();
+}
+
+// Turn marked panels into faces → grid → strings, then save training data.
+function spManualApply(){
+  if(!MM||!MM.panels.length){ alert('Mark at least one panel first.'); return; }
+  // Group panels by face
+  var byFace={};
+  MM.panels.forEach(function(pn){ (byFace[pn.face]=byFace[pn.face]||[]).push(pn); });
+  var groups=Object.keys(byFace).map(function(fk){
+    var ps=byFace[fk];
+    var xs=ps.map(function(p){return p.cx;}), ys=ps.map(function(p){return p.cy;});
+    var cols=spEstimateLines(xs, Math.max(6,(Math.max.apply(null,xs)-Math.min.apply(null,xs))/Math.max(1,Math.round(Math.sqrt(ps.length)))));
+    var rows=Math.ceil(ps.length/Math.max(1,cols));
+    // dominant orientation of the face
+    var land=ps.filter(function(p){return p.orient==='L';}).length;
+    return {count:ps.length, orient: land>ps.length/2?'L':'P', rows:Math.max(1,rows), cols:Math.max(1,cols)};
+  });
+  // Save training example BEFORE building (captures detector-guess vs human truth)
+  spSaveTrainingExample(groups);
+  // Reuse the auto-apply pipeline by staging SP_AUTO with the manual groups
+  SP_AUTO=Object.assign(SP_AUTO||{}, {groups:groups, totalPanels:MM.panels.length, manual:true});
+  spManualClose();
+  spAutoApply();
+  spAutoStatus('Built from your manual marking: '+MM.panels.length+' panels across '+groups.length+' face'+(groups.length>1?'s':'')+'.');
+}
+
+// ── Training-data capture (for improving the detector later) ──────────────
+// Saved to a SEPARATE Drive appDataFolder file so it never bloats the jobs file.
+var GD_TRAIN_FILENAME='GreenGenUK_stringplan_training.jsonl';
+function spSaveTrainingExample(humanGroups){
+  try{
+    var example={
+      t:new Date().toISOString(),
+      ref:J.ref||'',
+      img:(MM&&MM.dataUrl)||'',            // the screenshot (base64)
+      imgW:(MM&&MM.W)||0, imgH:(MM&&MM.H)||0,
+      human:{                              // ground truth from the user
+        panels:(MM&&MM.panels)||[],
+        groups:humanGroups
+      },
+      detect:(MM&&MM.detect)||null,         // what the beta detector guessed
+      inverter:(J.inverters||[]).map(function(i){return {brand:i.brand,kw:i.kw,strings:i.strings};})
+    };
+    spAppendTraining(example);
+  }catch(e){ console.warn('[training] capture failed',e); }
+}
+async function spAppendTraining(example){
+  // Cache locally first (so nothing is lost if offline), then push to Drive.
+  try{
+    var local=JSON.parse(localStorage.getItem('gguk_sp_train')||'[]');
+    // keep local cache light — store metadata only, not the base64 image
+    var lite=Object.assign({},example); lite.img='[in-drive]';
+    local.push(lite); if(local.length>200) local=local.slice(-200);
+    localStorage.setItem('gguk_sp_train', JSON.stringify(local));
+  }catch(e){}
+  if(!GD_TOKEN){ return; } // will still have the local metadata; image saved next time online
+  try{
+    // Append as one JSON line to the training file in appDataFolder
+    var fid=await gdFindTrainingFile();
+    var prior='';
+    if(fid){
+      var r=await fetch('https://www.googleapis.com/drive/v3/files/'+fid+'?alt=media',{headers:{Authorization:'Bearer '+GD_TOKEN}});
+      if(r.ok) prior=await r.text();
+    }
+    var body=prior + JSON.stringify(example) + '\n';
+    if(fid){
+      await fetch('https://www.googleapis.com/upload/drive/v3/files/'+fid+'?uploadType=media',
+        {method:'PATCH',headers:{Authorization:'Bearer '+GD_TOKEN,'Content-Type':'application/json'},body:body});
+    }else{
+      var meta=JSON.stringify({name:GD_TRAIN_FILENAME,parents:['appDataFolder']});
+      var form=new FormData();
+      form.append('metadata',new Blob([meta],{type:'application/json'}));
+      form.append('file',new Blob([body],{type:'application/x-ndjson'}));
+      await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+        {method:'POST',headers:{Authorization:'Bearer '+GD_TOKEN},body:form});
+    }
+    console.log('[training] example saved to Drive');
+  }catch(e){ console.warn('[training] Drive save failed',e); }
+}
+async function gdFindTrainingFile(){
+  try{
+    var r=await fetch("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='"+GD_TRAIN_FILENAME+"'&fields=files(id)",
+      {headers:{Authorization:'Bearer '+GD_TOKEN}});
+    var d=await r.json(); return (d.files&&d.files[0])?d.files[0].id:null;
+  }catch(e){ return null; }
+}
+
 // G98 / G99
 // ════════════════════════════════════════════════════════════
 function syncDNO() {
