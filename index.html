@@ -21,6 +21,8 @@
 //# sourceMappingURL=chart.umd.js.map
 </script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,700;0,800;1,700&family=Dancing+Script:wght@700&family=Caveat:wght@600&family=Pacifico&display=swap" rel="stylesheet">
+<!-- Google Identity Services – preloaded so requestAccessToken() fires in user-gesture context -->
+<script src="https://accounts.google.com/gsi/client" async></script>
 <!-- Supabase -->
 <script>
 // Stub supabase so app never crashes if CDN fails
@@ -2288,26 +2290,35 @@ function gdSignIn() {
     alert('Google Drive sync needs a one-time setup. See the setup guide on the Saved Jobs page.');
     goSection('saved'); return;
   }
+  // If GSI already loaded (via <head> preload or prior dynamic load), call directly
+  // so requestAccessToken() runs synchronously within the click handler — browser
+  // treats this as a user gesture and allows the popup.
+  if(window.google && window.google.accounts && window.google.accounts.oauth2) {
+    _gdInitTokenClient(); return;
+  }
+  // Fallback: load GSI dynamically (first-ever load before preload resolves)
   const scr=document.createElement('script');
   scr.src='https://accounts.google.com/gsi/client';
-  scr.onload=function(){
-    const client=google.accounts.oauth2.initTokenClient({
-      client_id:GD_CLIENT_ID,
-      scope:GD_SCOPE+' https://www.googleapis.com/auth/userinfo.email',
-      callback:async function(resp){
-        if(resp.error){alert('Sign-in failed: '+resp.error);return;}
-        GD_TOKEN=resp.access_token;
-        try{
-          const r=await fetch('https://www.googleapis.com/oauth2/v1/userinfo',{headers:{Authorization:'Bearer '+GD_TOKEN}});
-          const u=await r.json(); GD_EMAIL=u.email||'';
-        }catch(e){}
-        try{localStorage.setItem('gguk_gd_tok',JSON.stringify({tok:GD_TOKEN,email:GD_EMAIL,exp:Date.now()+3500000,fid:GD_FILE_ID}));}catch(e){}
-        gdUI(true); gdStatus('Syncing…'); await gdSync();
-      }
-    });
-    client.requestAccessToken();
-  };
+  scr.onload=_gdInitTokenClient;
   document.head.appendChild(scr);
+}
+
+function _gdInitTokenClient() {
+  const client=google.accounts.oauth2.initTokenClient({
+    client_id:GD_CLIENT_ID,
+    scope:GD_SCOPE+' https://www.googleapis.com/auth/userinfo.email',
+    callback:async function(resp){
+      if(resp.error){alert('Sign-in failed: '+resp.error);return;}
+      GD_TOKEN=resp.access_token;
+      try{
+        const r=await fetch('https://www.googleapis.com/oauth2/v1/userinfo',{headers:{Authorization:'Bearer '+GD_TOKEN}});
+        const u=await r.json(); GD_EMAIL=u.email||'';
+      }catch(e){}
+      try{localStorage.setItem('gguk_gd_tok',JSON.stringify({tok:GD_TOKEN,email:GD_EMAIL,exp:Date.now()+3500000,fid:GD_FILE_ID}));}catch(e){}
+      gdUI(true); gdStatus('Syncing…'); await gdSync();
+    }
+  });
+  client.requestAccessToken();
 }
 
 function gdSignOut() {
